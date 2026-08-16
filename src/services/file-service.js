@@ -3,23 +3,24 @@ import { link, lstat, mkdir, open, readdir, stat, unlink } from 'node:fs/promise
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AppError, ValidationError } from '../errors/app-error.js';
+import { message } from '../i18n/index.js';
 
 const ALLOWED_EXTENSIONS = ['.bak.zip', '.bak.gz', '.bak', '.zip', '.gz'];
 const RESERVED_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
 
 export function validateBackupFilename(filename) {
   if (typeof filename !== 'string' || filename.length < 1 || filename.length > 200) {
-    throw new ValidationError('Nieprawidłowa długość nazwy pliku.');
+    throw new ValidationError(message('validation.filenameLengthInvalid'));
   }
   if (filename !== path.basename(filename) || /[/\\\0\x00-\x1f]/.test(filename) || filename.startsWith('.')) {
-    throw new ValidationError('Nieprawidłowa nazwa pliku.');
+    throw new ValidationError(message('validation.filenameInvalid'));
   }
   if (RESERVED_NAMES.test(filename) || !/^[\p{L}\p{N} _().-]+$/u.test(filename)) {
-    throw new ValidationError('Nazwa pliku zawiera niedozwolone znaki.');
+    throw new ValidationError(message('validation.filenameCharactersInvalid'));
   }
   const lower = filename.toLowerCase();
   if (!ALLOWED_EXTENSIONS.some((extension) => lower.endsWith(extension))) {
-    throw new ValidationError('Dozwolone są pliki .bak, .bak.zip, .bak.gz, .zip i .gz.');
+    throw new ValidationError(message('validation.backupFileExtensionInvalid'));
   }
   return filename;
 }
@@ -27,7 +28,7 @@ export function validateBackupFilename(filename) {
 function ensureInside(root, candidate) {
   const relative = path.relative(root, candidate);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || relative.includes(path.sep)) {
-    throw new ValidationError('Nieprawidłowa ścieżka pliku.');
+    throw new ValidationError(message('validation.filePathInvalid'));
   }
 }
 
@@ -98,10 +99,10 @@ export class FileService {
       return target;
     } catch (error) {
       if (error.code === 'EEXIST') {
-        throw new AppError('Plik już istnieje.', {
+        throw new AppError('File already exists.', {
           code: 'FILE_EXISTS',
           statusCode: 409,
-          userMessage: 'Plik o tej nazwie już istnieje.',
+          publicMessage: message('errors.fileAlreadyExists'),
           cause: error,
         });
       }
@@ -112,7 +113,7 @@ export class FileService {
   async inspect(filename) {
     const filePath = this.resolve(filename);
     const info = await stat(filePath);
-    if (!info.isFile()) throw new ValidationError('Wybrana ścieżka nie jest plikiem.');
+    if (!info.isFile()) throw new ValidationError(message('validation.selectedPathNotFile'));
     return { filePath, info };
   }
 
@@ -120,17 +121,17 @@ export class FileService {
     const filePath = this.resolve(filename);
     const info = await lstat(filePath).catch((error) => {
       if (error.code === 'ENOENT') {
-        throw new AppError('Plik nie istnieje.', {
+        throw new AppError('File does not exist.', {
           code: 'FILE_NOT_FOUND',
           statusCode: 404,
-          userMessage: 'Wybrany plik już nie istnieje.',
+          publicMessage: message('errors.fileNotFound'),
           cause: error,
         });
       }
       throw error;
     });
     if (!info.isFile() || info.isSymbolicLink()) {
-      throw new ValidationError('Wybrana ścieżka nie jest zwykłym plikiem.');
+      throw new ValidationError(message('validation.selectedPathNotRegularFile'));
     }
     await unlink(filePath);
     return { filename };
@@ -142,7 +143,7 @@ export class FileService {
     try {
       const info = await handle.stat();
       const linkInfo = await lstat(filePath);
-      if (!info.isFile() || linkInfo.isSymbolicLink()) throw new ValidationError('Wybrana ścieżka nie jest zwykłym plikiem.');
+      if (!info.isFile() || linkInfo.isSymbolicLink()) throw new ValidationError(message('validation.selectedPathNotRegularFile'));
       return { filePath, handle, info };
     } catch (error) {
       await handle.close();

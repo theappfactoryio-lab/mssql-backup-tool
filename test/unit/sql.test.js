@@ -30,8 +30,10 @@ test('mapuje błąd żądania SQL na komunikat operacji', () => {
   }));
 
   assert.equal(mapped.code, 'SQL_RESTORE_FAILED');
-  assert.equal(mapped.userMessage,
-    'SQL Server odrzucił operację: Cannot open backup device. Access is denied.');
+  assert.deepEqual(mapped.publicMessage, {
+    key: 'errors.sql.operationRejected',
+    params: { detail: 'Cannot open backup device. Access is denied.' },
+  });
 });
 
 test('mapuje numer produktu na nazwę wydania SQL Server', () => {

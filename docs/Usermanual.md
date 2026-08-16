@@ -7,12 +7,13 @@ MSSQLBackupTool to aplikacja webowa służąca do tworzenia, przesyłania, pobie
 ## 1. Otwieranie aplikacji
 
 1. Otwórz w przeglądarce adres podany przez administratora.
-2. Poczekaj na załadowanie list baz danych i plików backupów.
-3. W sekcji **Środowisko SQL Server** sprawdź stan połączenia:
+2. Jeżeli przeglądarka wyświetli okno logowania, podaj współdzielony login i hasło otrzymane od administratora. Aplikacja korzysta z HTTP Basic Auth, więc nie ma osobnego ekranu ani przycisku wylogowania; zakończenie dostępu może wymagać zamknięcia wszystkich okien przeglądarki.
+3. Poczekaj na załadowanie list baz danych i plików backupów.
+4. W sekcji **Środowisko SQL Server** sprawdź stan połączenia:
    - **Połączono** — aplikacja może komunikować się z SQL Serverem;
    - **Brak połączenia** — część funkcji nie będzie dostępna. Odśwież informacje przyciskiem **↻**, a jeśli problem nie ustąpi, skontaktuj się z administratorem.
 
-W prawym górnym rogu można zmienić jasny lub ciemny motyw oraz kolor podstawowy interfejsu. Ustawienia są zapamiętywane w przeglądarce.
+W prawym górnym rogu można wybrać język angielski, niemiecki, hiszpański lub polski oraz zmienić jasny lub ciemny motyw i kolor podstawowy interfejsu. Zmiana języka przeładowuje stronę. Wszystkie te ustawienia są zapamiętywane w przeglądarce; bez zapisanego wyboru używany jest język ustawiony przez administratora, domyślnie angielski.
 
 ## 2. Tworzenie backupu
 

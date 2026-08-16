@@ -1,48 +1,15 @@
 <div id="operation-dialog-host">
 <% if (operation) { const running = operation.status === 'running'; %>
-  <dialog class="operation-dialog operation--<%= operation.status %>" data-operation-dialog data-operation-status="<%= operation.status %>"
-    aria-labelledby="operation-title-<%= operation.id %>" aria-describedby="operation-summary-<%= operation.id %>"
-    <% if (running) { %>hx-get="/partials/operations/<%= operation.id %>" hx-trigger="every 2s" hx-target="#operation-dialog-host" hx-swap="outerHTML"<% } %>>
-    <div class="operation-dialog__header">
-      <span class="status-dot" aria-hidden="true"></span>
-      <div>
-        <h2 id="operation-title-<%= operation.id %>" tabindex="-1"><%= running ? 'Operacja w toku' : operation.status === 'succeeded' ? 'Operacja zakończona' : 'Operacja nie powiodła się' %></h2>
-        <p id="operation-summary-<%= operation.id %>"><%= operation.summary %></p>
-      </div>
-      <span class="operation-dialog__state"><%= running ? 'W toku' : operation.status === 'succeeded' ? 'Sukces' : 'Błąd' %></span>
-    </div>
-    <% if (operation.progress !== null) { %>
-      <div class="operation-progress"><span>Postęp</span><strong><%= operation.progress %>%</strong>
-        <progress value="<%= operation.progress %>" max="100"><%= operation.progress %>%</progress>
-      </div>
-    <% } %>
-    <div class="operation-log-wrap">
-      <label for="operation-log-<%= operation.id %>">Log operacji</label>
-      <textarea id="operation-log-<%= operation.id %>" class="operation-log" rows="6" readonly wrap="off"><% for (const event of operation.events ?? []) { const source = event.source === 'sql-server' ? 'SQL Server' : event.source === 'upload' ? 'Upload' : 'Aplikacja'; %><%= new Date(event.timestamp).toLocaleTimeString('pl-PL') %>  <%= source.padEnd(10) %>  <%= event.message %>
-<% } %></textarea>
-      <% const latestEvent = operation.events?.at(-1); if (running && latestEvent) { %><span class="visually-hidden" role="status" aria-live="polite"><%= latestEvent.message %></span><% } %>
-    </div>
-    <% if (!running) { %>
-      <div class="operation-result" role="<%= operation.status === 'failed' ? 'alert' : 'status' %>">
-        <% if (operation.status === 'succeeded' && operation.type === 'shrink-log') { %>
-          <strong>Zmniejszanie logu zakończone</strong>
-          <span><%= operation.result.databaseName %>: <%= formatBytes(operation.result.beforeBytes) %> → <%= formatBytes(operation.result.afterBytes) %>, odzyskano <%= formatBytes(operation.result.reclaimedBytes) %>.<% if (operation.result.backupChainBroken) { %> Łańcuch backupów logu został przerwany — wykonaj regularny pełny backup.<% } %></span>
-        <% } else if (operation.status === 'succeeded') { %>
-          <strong>Powodzenie</strong><span><%= operation.result?.filename || operation.result?.databaseName || 'Operacja zakończona.' %></span>
-        <% } else { %>
-          <strong>Błąd</strong><span><%= operation.error?.message %></span>
-        <% } %>
-      </div>
-    <% } %>
-    <div class="operation-dialog__footer">
-      <% if (running) { %><span>Okno będzie można zamknąć po zakończeniu operacji.</span>
-      <% } else { %>
-        <form hx-post="/operations/<%= operation.id %>/acknowledge" hx-target="#operation-dialog-host" hx-swap="outerHTML">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button class="button button--primary operation-dialog__ok" type="submit">OK</button>
-        </form>
-      <% } %>
-    </div>
+  <dialog class="operation-dialog operation--<%= operation.status %>" data-operation-dialog data-operation-status="<%= operation.status %>" aria-labelledby="operation-title-<%= operation.id %>" aria-describedby="operation-summary-<%= operation.id %>" <% if (running) { %>hx-get="/partials/operations/<%= operation.id %>" hx-trigger="every 2s" hx-target="#operation-dialog-host" hx-swap="outerHTML"<% } %>>
+    <div class="operation-dialog__header"><span class="status-dot" aria-hidden="true"></span><div><h2 id="operation-title-<%= operation.id %>" tabindex="-1"><%= t(running ? 'operations.status.runningTitle' : operation.status === 'succeeded' ? 'operations.status.succeededTitle' : 'operations.status.failedTitle') %></h2><p id="operation-summary-<%= operation.id %>"><%= operation.summary %></p></div><span class="operation-dialog__state"><%= t(running ? 'status.running' : operation.status === 'succeeded' ? 'status.success' : 'status.error') %></span></div>
+    <% if (operation.progress !== null) { %><div class="operation-progress"><span><%= t('operations.progress') %></span><strong><%= formatPercent(operation.progress) %></strong><progress value="<%= operation.progress %>" max="100"><%= formatPercent(operation.progress) %></progress></div><% } %>
+    <div class="operation-log-wrap"><label for="operation-log-<%= operation.id %>"><%= t('operations.log.label') %></label><textarea id="operation-log-<%= operation.id %>" class="operation-log" rows="6" readonly wrap="off"><% for (const event of operation.events ?? []) { const source = t(event.source === 'sql-server' ? 'operations.source.sqlServer' : event.source === 'upload' ? 'operations.source.upload' : 'operations.source.application'); %><%= formatTime(event.timestamp) %>  <%= source %>  <%= event.message %>
+<% } %></textarea><% const latestEvent = operation.events?.at(-1); if (running && latestEvent) { %><span class="visually-hidden" role="status" aria-live="polite"><%= latestEvent.message %></span><% } %></div>
+    <% if (!running) { %><div class="operation-result" role="<%= operation.status === 'failed' ? 'alert' : 'status' %>">
+      <% if (operation.status === 'succeeded' && operation.type === 'shrink-log') { const resultParams = { databaseName: operation.result.databaseName, before: formatBytes(operation.result.beforeBytes), after: formatBytes(operation.result.afterBytes), reclaimed: formatBytes(operation.result.reclaimedBytes) }; %><strong><%= t('operations.shrink.resultTitle') %></strong><span><%= t('operations.shrink.result', resultParams) %><% if (operation.result.backupChainBroken) { %> <%= t('operations.shrink.backupChainBroken') %><% } %></span>
+      <% } else if (operation.status === 'succeeded') { %><strong><%= t('operations.result.success') %></strong><span><%= operation.result?.filename || operation.result?.databaseName || t('operations.result.completed') %></span>
+      <% } else { %><strong><%= t('status.error') %></strong><span><%= operation.error?.message %></span><% } %></div><% } %>
+    <div class="operation-dialog__footer"><% if (running) { %><span><%= t('operations.running.cannotClose') %></span><% } else { %><form hx-post="/operations/<%= operation.id %>/acknowledge" hx-target="#operation-dialog-host" hx-swap="outerHTML"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button button--primary operation-dialog__ok" type="submit"><%= t('common.ok') %></button></form><% } %></div>
   </dialog>
 <% } %>
 </div>

@@ -1,22 +1,11 @@
-<div id="file-table-wrap" class="table-wrap"<% if (oob) { %> hx-swap-oob="outerHTML"<% } %>><table class="file-table"><caption>Backupy dostępne do pobrania i odtworzenia</caption>
-  <thead><tr><th scope="col">Nazwa</th><th scope="col">Format</th><th scope="col">Rozmiar</th><th scope="col">Zmodyfikowano</th><th scope="col">Akcje</th></tr></thead>
-  <tbody><% if (!files.length) { %><tr><td colspan="5" class="empty">Brak plików backupów.</td></tr><% } %>
-  <% for (const [fileIndex, file] of files.entries()) { %><tr><td title="<%= file.name %>"><strong><%= file.name %></strong></td><td><%= file.format %></td><td class="numeric"><%= (file.size / 1024 / 1024).toFixed(1) %> MB</td><td><time datetime="<%= file.modifiedAt.toISOString() %>"><%= file.modifiedAt.toLocaleString('pl-PL') %></time></td><td><div class="actions file-actions">
-    <span class="action-with-tooltip">
-      <a class="button icon-button button--secondary" href="/files/<%= encodeURIComponent(file.name) %>/download" aria-label="Pobierz plik <%= file.name %>" aria-describedby="download-tip-<%= fileIndex %>">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg>
-      </a>
-      <span id="download-tip-<%= fileIndex %>" class="action-tooltip" role="tooltip">Pobierz backup</span>
-    </span>
-    <form class="action-with-tooltip" hx-post="/files/delete" hx-target="#operation-dialog-host" hx-swap="outerHTML" hx-confirm="Czy na pewno usunąć plik '<%= file.name %>'?"
-      data-confirm-variant="danger" data-confirm-title="Usunąć plik backupu?" data-confirm-action="Usuń plik">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <input type="hidden" name="filename" value="<%= file.name %>">
-      <input type="hidden" name="confirmDelete" value="yes">
-      <button class="button icon-button button--danger" type="submit" aria-label="Usuń plik <%= file.name %>" aria-describedby="delete-file-tip-<%= fileIndex %>">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>
-      </button>
-      <span id="delete-file-tip-<%= fileIndex %>" class="action-tooltip" role="tooltip">Usuń backup</span>
+<div id="file-table-wrap" class="table-wrap"<% if (oob) { %> hx-swap-oob="outerHTML"<% } %>><table class="file-table"><caption><%= t('files.table.caption') %></caption>
+  <thead><tr><th scope="col"><%= t('files.table.name') %></th><th scope="col"><%= t('files.table.format') %></th><th scope="col"><%= t('files.table.size') %></th><th scope="col"><%= t('files.table.modifiedAt') %></th><th scope="col"><%= t('common.actions') %></th></tr></thead>
+  <tbody><% if (!files.length) { %><tr><td colspan="5" class="empty"><%= t('files.table.empty') %></td></tr><% } %>
+  <% for (const [fileIndex, file] of files.entries()) { %><tr><td title="<%= file.name %>"><strong><%= file.name %></strong></td><td><%= file.format %></td><td class="numeric"><%= formatBytes(file.size) %></td><td><time datetime="<%= file.modifiedAt.toISOString() %>"><%= formatDateTime(file.modifiedAt) %></time></td><td><div class="actions file-actions">
+    <span class="action-with-tooltip"><a class="button icon-button button--secondary" href="/files/<%= encodeURIComponent(file.name) %>/download" aria-label="<%= t('files.download.aria', { filename: file.name }) %>" aria-describedby="download-tip-<%= fileIndex %>"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg></a><span id="download-tip-<%= fileIndex %>" class="action-tooltip" role="tooltip"><%= t('files.download.tooltip') %></span></span>
+    <form class="action-with-tooltip" hx-post="/files/delete" hx-target="#operation-dialog-host" hx-swap="outerHTML" hx-confirm="<%= t('files.delete.confirm', { filename: file.name }) %>" data-confirm-variant="danger" data-confirm-title="<%= t('files.delete.title') %>" data-confirm-action="<%= t('files.delete.action') %>">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="filename" value="<%= file.name %>"><input type="hidden" name="confirmDelete" value="yes">
+      <button class="button icon-button button--danger" type="submit" aria-label="<%= t('files.delete.aria', { filename: file.name }) %>" aria-describedby="delete-file-tip-<%= fileIndex %>"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button><span id="delete-file-tip-<%= fileIndex %>" class="action-tooltip" role="tooltip"><%= t('files.delete.tooltip') %></span>
     </form>
   </div></td></tr><% } %></tbody>
 </table></div>

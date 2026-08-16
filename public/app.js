@@ -1,11 +1,21 @@
 let operationTrigger = null;
 let pendingConfirmation = null;
 
+function readClientI18n() {
+  try {
+    const value = JSON.parse(document.getElementById('client-i18n')?.textContent ?? '{}');
+    return { locale: typeof value.locale === 'string' ? value.locale : 'en-GB', messages: value.messages ?? {} };
+  } catch { return { locale: 'en-GB', messages: {} }; }
+}
+const clientI18n = readClientI18n();
+const clientMessage = (key, fallback = key) => typeof clientI18n.messages[key] === 'string' ? clientI18n.messages[key] : fallback;
+const formatPercent = (value) => new Intl.NumberFormat(clientI18n.locale, { style: 'percent', maximumFractionDigits: 0 }).format(value / 100);
+
 function updateThemeToggle() {
   const toggle = document.querySelector('[data-theme-toggle]');
   if (!toggle) return;
   const isDark = document.documentElement.dataset.theme === 'dark';
-  const label = isDark ? 'Włącz jasny motyw' : 'Włącz ciemny motyw';
+  const label = clientMessage(isDark ? 'client.theme.enableLight' : 'client.theme.enableDark');
   toggle.setAttribute('aria-pressed', String(isDark));
   toggle.setAttribute('aria-label', label);
   toggle.title = label;
@@ -15,7 +25,7 @@ function updateAccentToggle() {
   const toggle = document.querySelector('[data-accent-toggle]');
   if (!toggle) return;
   const isBlue = document.documentElement.dataset.accent === 'blue';
-  const label = isBlue ? 'Zmień kolor podstawowy na czerwony' : 'Zmień kolor podstawowy na niebieski';
+  const label = clientMessage(isBlue ? 'client.accent.switchToRed' : 'client.accent.switchToBlue');
   toggle.setAttribute('aria-pressed', String(isBlue));
   toggle.setAttribute('aria-label', label);
   toggle.title = label;
@@ -36,6 +46,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.cookie = `accent=${root.dataset.accent}; Path=/; Max-Age=31536000; SameSite=Lax`;
     updateAccentToggle();
   });
+  const languageForm = document.querySelector('[data-language-form]');
+  const languageSelect = document.getElementById('ui-language');
+  const languageSubmit = languageForm?.querySelector('.language-submit');
+  if (languageForm && languageSelect && languageSubmit) {
+    languageSelect.addEventListener('change', () => {
+      sessionStorage.setItem('restore-language-focus', 'true');
+      languageForm.requestSubmit();
+    });
+  }
+  if (sessionStorage.getItem('restore-language-focus') === 'true') {
+    sessionStorage.removeItem('restore-language-focus');
+    languageSelect?.focus();
+  }
 });
 
 function openOperationDialog() {
@@ -91,9 +114,9 @@ document.addEventListener('htmx:confirm', (event) => {
   const variant = metadata.dataset.confirmVariant ?? 'danger';
   const focusTarget = document.activeElement instanceof HTMLElement ? document.activeElement : trigger;
   pendingConfirmation = { trigger: focusTarget, issueRequest: event.detail.issueRequest };
-  title.textContent = metadata.dataset.confirmTitle ?? 'Potwierdź operację';
+  title.textContent = metadata.dataset.confirmTitle ?? clientMessage('confirmation.defaultTitle');
   message.textContent = event.detail.question;
-  acceptButton.textContent = metadata.dataset.confirmAction ?? 'Potwierdź';
+  acceptButton.textContent = metadata.dataset.confirmAction ?? clientMessage('common.confirm');
   acceptButton.disabled = false;
   acceptButton.className = `button ${variant === 'warning' ? 'button--warning' : 'button--danger'}`;
   dialog.classList.toggle('operation--failed', variant === 'danger');
@@ -105,8 +128,11 @@ document.addEventListener('htmx:confirm', (event) => {
 function showClientError(message) {
   const host = document.getElementById('operation-dialog-host');
   if (!host) return;
-  host.innerHTML = `<dialog class="operation-dialog operation--failed" data-operation-dialog data-operation-status="failed" aria-labelledby="client-error-title"><div class="operation-dialog__header"><span class="status-dot" aria-hidden="true"></span><div><h2 id="client-error-title" tabindex="-1">Nie można wykonać operacji</h2><p></p></div><span class="operation-dialog__state">Błąd</span></div><div class="operation-dialog__footer"><button class="button button--primary operation-dialog__ok" type="button" data-dialog-close>OK</button></div></dialog>`;
+  host.innerHTML = `<dialog class="operation-dialog operation--failed" data-operation-dialog data-operation-status="failed" aria-labelledby="client-error-title"><div class="operation-dialog__header"><span class="status-dot" aria-hidden="true"></span><div><h2 id="client-error-title" tabindex="-1"></h2><p></p></div><span class="operation-dialog__state"></span></div><div class="operation-dialog__footer"><button class="button button--primary operation-dialog__ok" type="button" data-dialog-close></button></div></dialog>`;
+  host.querySelector('h2').textContent = clientMessage('errors.operationFailedTitle');
   host.querySelector('p').textContent = message;
+  host.querySelector('.operation-dialog__state').textContent = clientMessage('status.error');
+  host.querySelector('button').textContent = clientMessage('common.ok');
   openOperationDialog();
 }
 
@@ -165,19 +191,26 @@ if (uploadForm) {
 
   fileInput.addEventListener('change', () => {
     if (!fileInput.files?.length) return;
-    pickerText.textContent = 'Przesyłanie…';
+    pickerText.textContent = clientMessage('client.upload.uploading');
     fileInput.style.pointerEvents = 'none';
     uploadForm.requestSubmit();
   });
 
   uploadForm.addEventListener('htmx:beforeRequest', () => {
     progress.value = 0;
-    progress.textContent = '0%';
-    progressValue.textContent = '0%';
+    progress.textContent = formatPercent(0);
+    progressValue.textContent = formatPercent(0);
     progressContainer.hidden = false;
     const host = document.getElementById('operation-dialog-host');
     if (host) {
-      host.innerHTML = `<dialog class="operation-dialog operation--running" data-operation-dialog data-operation-status="running" aria-labelledby="upload-dialog-title"><div class="operation-dialog__header"><span class="status-dot" aria-hidden="true"></span><div><h2 id="upload-dialog-title" tabindex="-1">Przesyłanie pliku</h2><p>Wysyłanie pliku do aplikacji.</p></div><span class="operation-dialog__state">W toku</span></div><div class="operation-progress"><span>Postęp</span><strong data-upload-dialog-value>0%</strong><progress data-upload-dialog-progress value="0" max="100">0%</progress></div><div class="operation-dialog__footer"><span>Okno będzie można zamknąć po zakończeniu operacji.</span></div></dialog>`;
+      host.innerHTML = `<dialog class="operation-dialog operation--running" data-operation-dialog data-operation-status="running" aria-labelledby="upload-dialog-title"><div class="operation-dialog__header"><span class="status-dot" aria-hidden="true"></span><div><h2 id="upload-dialog-title" tabindex="-1"></h2><p></p></div><span class="operation-dialog__state"></span></div><div class="operation-progress"><span></span><strong data-upload-dialog-value></strong><progress data-upload-dialog-progress value="0" max="100"></progress></div><div class="operation-dialog__footer"><span></span></div></dialog>`;
+      host.querySelector('h2').textContent = clientMessage('client.upload.dialogTitle');
+      host.querySelector('.operation-dialog__header p').textContent = clientMessage('client.upload.dialogSummary');
+      host.querySelector('.operation-dialog__state').textContent = clientMessage('status.running');
+      host.querySelector('.operation-progress > span').textContent = clientMessage('operations.progress');
+      host.querySelector('[data-upload-dialog-value]').textContent = formatPercent(0);
+      host.querySelector('[data-upload-dialog-progress]').textContent = formatPercent(0);
+      host.querySelector('.operation-dialog__footer span').textContent = clientMessage('operations.running.cannotClose');
       openOperationDialog();
     }
   });
@@ -185,20 +218,21 @@ if (uploadForm) {
   uploadForm.addEventListener('htmx:xhr:progress', (event) => {
     if (!event.detail.total) return;
     const percentage = Math.min(100, Math.round(event.detail.loaded / event.detail.total * 100));
+    const formatted = formatPercent(percentage);
     progress.value = percentage;
-    progress.textContent = `${percentage}%`;
-    progressValue.textContent = `${percentage}%`;
+    progress.textContent = formatted;
+    progressValue.textContent = formatted;
     const dialogProgress = document.querySelector('[data-upload-dialog-progress]');
     const dialogValue = document.querySelector('[data-upload-dialog-value]');
     if (dialogProgress) dialogProgress.value = percentage;
-    if (dialogValue) dialogValue.textContent = `${percentage}%`;
+    if (dialogValue) dialogValue.textContent = formatted;
   });
 
   uploadForm.addEventListener('htmx:afterRequest', () => {
     progressContainer.hidden = true;
     fileInput.style.pointerEvents = '';
     fileInput.value = '';
-    pickerText.textContent = 'Wybierz i prześlij plik';
+    pickerText.textContent = clientMessage('files.upload.choose');
   });
 }
 
@@ -278,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mode === 'existing' && !allowOverwrite.checked) {
         ev.preventDefault();
         operationTrigger = ev.submitter ?? form;
-        showClientError('Zaznacz zgodę na nadpisanie bazy.');
+        showClientError(clientMessage('validation.restoreOverwriteConsentRequired'));
       }
     });
     // For HTMX-driven requests
@@ -287,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mode === 'existing' && !allowOverwrite.checked) {
         ev.preventDefault();
         operationTrigger = ev.detail?.elt ?? form;
-        showClientError('Zaznacz zgodę na nadpisanie bazy.');
+        showClientError(clientMessage('validation.restoreOverwriteConsentRequired'));
       }
     });
   }
