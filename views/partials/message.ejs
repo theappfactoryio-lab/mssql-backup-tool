@@ -2,11 +2,11 @@
   <dialog class="operation-dialog operation--failed" data-operation-dialog data-operation-status="failed" aria-labelledby="operation-message-title" aria-describedby="operation-message-body">
     <div class="operation-dialog__header">
       <span class="status-dot" aria-hidden="true"></span>
-      <div><h2 id="operation-message-title" tabindex="-1">Nie można wykonać operacji</h2><p id="operation-message-body"><%= message %></p></div>
-      <span class="operation-dialog__state">Błąd</span>
+      <div><h2 id="operation-message-title" tabindex="-1"><%= t('errors.operationFailedTitle') %></h2><p id="operation-message-body"><%= message %></p></div>
+      <span class="operation-dialog__state"><%= t('status.error') %></span>
     </div>
     <div class="operation-dialog__footer">
-      <button class="button button--primary operation-dialog__ok" type="button" data-dialog-close>OK</button>
+      <button class="button button--primary operation-dialog__ok" type="button" data-dialog-close><%= t('common.ok') %></button>
     </div>
   </dialog>
 </div>

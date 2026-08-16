@@ -7,8 +7,10 @@ import { createPool } from './db/pool.js';
 import { DatabaseRepository } from './db/database-repository.js';
 import { BackupService } from './services/backup-service.js';
 import { RestoreService } from './services/restore-service.js';
+import { createTranslator } from './i18n/index.js';
 
 const config = loadConfig();
+const { t } = createTranslator(config.defaultLanguage);
 const operationManager = new OperationManager();
 const files = new FileService(config);
 await files.initialize();
@@ -23,9 +25,12 @@ const server = createServer(app);
 server.requestTimeout = config.requestTimeoutMs;
 
 server.listen(config.port, config.host, () => {
-  console.log(`MSSQLBackupTool nasłuchuje na porcie ${config.port}.`);
+  console.log(t('server.started', { port: config.port }));
+  if (!config.auth.enabled) {
+    console.warn(`[AUTH_DISABLED] ${t('server.authDisabled')}`);
+  }
   void pool.connect().catch((error) => {
-    console.error(`[MSSQL_CONNECTION_FAILED] ${error.message}`);
+    console.error(`[MSSQL_CONNECTION_FAILED] ${t('server.databaseConnectionFailed', { detail: error.message })}`);
   });
 });
 

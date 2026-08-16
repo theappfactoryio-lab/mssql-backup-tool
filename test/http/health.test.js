@@ -4,15 +4,44 @@ import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { OperationManager } from '../../src/operations/operation-manager.js';
 
-test('healthcheck nie zależy od MSSQL', async () => {
+test('healthcheck nie zależy od MSSQL ani uwierzytelniania', async () => {
   const app = createApp({
-    config: { maxUploadBytes: 1 },
+    config: { maxUploadBytes: 1, auth: { enabled: true, username: 'operator', password: 'secret' } },
     operationManager: new OperationManager(),
     services: { database: { listDatabases: () => { throw new Error('SQL offline'); } } },
   });
   const response = await request(app).get('/health');
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { status: 'ok' });
+});
+
+test('chroni panel, zasoby statyczne, status i mutacje', async () => {
+  const auth = { enabled: true, username: 'operator', password: 'secret' };
+  const app = createApp({
+    config: { maxUploadBytes: 1024, publicOrigin: 'http://localhost:8080', auth },
+    operationManager: new OperationManager(),
+    services: {},
+  });
+
+  for (const path of ['/', '/public/app.js', '/operations/current']) {
+    const response = await request(app).get(path);
+    assert.equal(response.status, 401);
+    assert.match(response.headers['www-authenticate'], /^Basic /);
+  }
+  const htmx = await request(app).get('/operations/current').set('HX-Request', 'true');
+  assert.equal(htmx.status, 401);
+  assert.match(htmx.headers['www-authenticate'], /^Basic /);
+  assert.equal((await request(app).post('/operations/backup')).status, 401);
+  assert.equal((await request(app).get('/operations/current').auth('operator', 'secret')).status, 200);
+});
+
+test('pozwala wyłączyć uwierzytelnianie', async () => {
+  const app = createApp({
+    config: { maxUploadBytes: 1024, auth: { enabled: false } },
+    operationManager: new OperationManager(),
+    services: {},
+  });
+  assert.equal((await request(app).get('/')).status, 200);
 });
 
 test('renderuje ekran roboczy z bazami i plikami', async () => {
@@ -30,8 +59,9 @@ test('renderuje ekran roboczy z bazami i plikami', async () => {
   });
   const response = await request(app).get('/');
   assert.equal(response.status, 200);
-  assert.match(response.text, /Wykonaj backup/);
-  assert.match(response.text, /Bazy danych i ich parametry administracyjne/);
+  assert.match(response.text, /<html lang="en">/);
+  assert.match(response.text, /Create backup/);
+  assert.match(response.text, /Databases and their administrative properties/);
   assert.match(response.text, /SIMPLE/);
   assert.match(response.text, /Demo\.bak/);
 });
@@ -58,7 +88,7 @@ test('renderuje informacje o środowisku SQL Server', async () => {
 
   const response = await request(app).get('/');
   assert.equal(response.status, 200);
-  assert.match(response.text, /Środowisko SQL Server/);
+  assert.match(response.text, /SQL Server environment/);
   assert.match(response.text, /SQL01\\DEV/);
   assert.match(response.text, /SQL Server 2022 · 16\.0\.1000\.6 \(RTM\)/);
   assert.match(response.text, /Developer Edition/);
@@ -88,14 +118,14 @@ test('pokazuje bezpieczny stan braku połączenia bez blokowania strony', async 
 
   const response = await request(app).get('/');
   assert.equal(response.status, 200);
-  assert.match(response.text, /Nie można nawiązać połączenia z SQL Serverem/);
-  assert.match(response.text, /Lista baz jest niedostępna/);
+  assert.match(response.text, /Unable to connect to SQL Server/);
+  assert.match(response.text, /database list is unavailable/i);
   assert.match(response.text, /offline\.bak/);
   assert.doesNotMatch(response.text, /tajny_admin/);
 
   const partial = await request(app).get('/partials/sql-environment');
   assert.equal(partial.status, 200);
-  assert.match(partial.text, /Brak połączenia/);
+  assert.match(partial.text, /Disconnected/);
   assert.doesNotMatch(partial.text, /tajny_admin/);
 });
 

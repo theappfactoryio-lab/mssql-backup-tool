@@ -7,8 +7,10 @@ import { unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import multer from 'multer';
 import { create as contentDisposition } from 'content-disposition';
+import { createBasicAuthMiddleware } from './middleware/basic-auth.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { ValidationError } from './errors/app-error.js';
+import { createLocaleMiddleware, localizeOperation, message, normalizeLanguage } from './i18n/index.js';
 
 const rootDirectory = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -21,28 +23,21 @@ export function createApp({ config, operationManager, services = {} }) {
   app.locals.operationManager = operationManager;
   app.locals.csrfToken = csrfToken;
   app.locals.enableShrinkLog = config.enableShrinkLog;
-  app.locals.formatBytes = (value) => {
-    if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
-    const bytes = Number(value);
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let unit = 0;
-    let amount = bytes;
-    while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit += 1; }
-    return `${amount.toLocaleString('pl-PL', { maximumFractionDigits: unit === 0 ? 0 : 1 })} ${units[unit]}`;
-  };
   app.use(helmet({ contentSecurityPolicy: false }));
+  app.get('/health', (request, response) => response.json({ status: 'ok' }));
+  app.use(createLocaleMiddleware(config.defaultLanguage ?? 'en'));
+  app.use(createBasicAuthMiddleware(config.auth));
   app.use(express.urlencoded({ extended: false, limit: '64kb' }));
   app.use('/public', express.static(path.join(rootDirectory, 'public'), { fallthrough: false }));
   // htmx is loaded from CDN in the views to avoid bundling it into the image
 
-  app.get('/health', (request, response) => response.json({ status: 'ok' }));
   app.get('/operations/current', (request, response) => {
-    response.json({ operation: operationManager.getStatus() });
+    response.json({ operation: localizeOperation(operationManager.getStatus(), response.locals) });
   });
 
   const environmentTarget = config.database
     ? `${config.database.server}:${config.database.port}`
-    : 'Nie skonfigurowano';
+    : null;
   const disconnectedEnvironment = () => ({
     connected: false,
     target: environmentTarget,
@@ -84,10 +79,11 @@ export function createApp({ config, operationManager, services = {} }) {
 
   async function renderOperation(request, response, next) {
     try {
-      const operation = operationManager.getStatus(request.params.id ?? null);
-      if (!operation) return response.status(404).render('partials/message', {
-        type: 'error', message: 'Status tej operacji nie jest już dostępny.',
+      const storedOperation = operationManager.getStatus(request.params.id ?? null);
+      if (!storedOperation) return response.status(404).render('partials/message', {
+        type: 'error', message: response.locals.t('operation.statusUnavailable'),
       });
+      const operation = localizeOperation(storedOperation, response.locals);
       const refreshData = operation.status !== 'running';
       let databases = [];
       let databaseDetails = [];
@@ -111,30 +107,40 @@ export function createApp({ config, operationManager, services = {} }) {
 
   function protectMutation(request, response, next) {
     const origin = request.get('origin');
-    if ((origin && origin !== config.publicOrigin) || request.body?._csrf !== csrfToken) {
-      return next(new ValidationError('Żądanie zostało odrzucone. Odśwież stronę i spróbuj ponownie.'));
+    const originCanBeValidated = origin && origin !== 'null';
+    if ((originCanBeValidated && origin !== config.publicOrigin) || request.body?._csrf !== csrfToken) {
+      return next(new ValidationError(message('errors.requestRejected')));
     }
     next();
   }
 
+  app.post('/language', protectMutation, (request, response, next) => {
+    const language = normalizeLanguage(request.body.language);
+    if (!language) return next(new ValidationError(message('config.languageUnsupported', { supportedLanguages: 'en, de, es, pl' })));
+    const secure = new URL(config.publicOrigin ?? 'http://localhost').protocol === 'https:' ? '; Secure' : '';
+    response.setHeader('Set-Cookie', `ui_language=${language}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`);
+    response.redirect(303, '/');
+  });
+
   app.post('/operations/:id/acknowledge', protectMutation, (request, response) => {
     const acknowledged = operationManager.acknowledge(request.params.id);
     if (!acknowledged) return response.status(409).render('partials/message', {
-      type: 'error', message: 'Operacja nadal trwa albo jej status nie jest już dostępny.',
+      type: 'error', message: response.locals.t('operation.acknowledgeUnavailable'),
     });
     response.status(200).send('<div id="operation-dialog-host"></div>');
   });
 
   function accepted(response, operation) {
     response.status(202).render('partials/operation-status', {
-      operation, refreshData: false, databases: [], databaseDetails: [], databasesAvailable: true,
+      operation: localizeOperation(operation, response.locals), refreshData: false,
+      databases: [], databaseDetails: [], databasesAvailable: true,
       files: [], csrfToken, enableShrinkLog: config.enableShrinkLog,
     });
   }
 
   app.post('/operations/backup', protectMutation, (request, response, next) => {
     try {
-      const operation = operationManager.tryStart({ type: 'backup', summary: 'Przygotowanie backupu',
+      const operation = operationManager.tryStart({ type: 'backup', summary: message('operation.summary.backupPreparing'),
         work: (context) => services.backup.run({ databaseName: request.body.databaseName,
           compression: request.body.compression }, context) });
       accepted(response, operation);
@@ -143,7 +149,7 @@ export function createApp({ config, operationManager, services = {} }) {
   app.post('/operations/verify', protectMutation, (request, response, next) => {
     try {
       const filename = request.body.filename;
-      const operation = operationManager.tryStart({ type: 'verify', summary: `Weryfikowanie ${filename}`,
+      const operation = operationManager.tryStart({ type: 'verify', summary: message('operation.summary.fileVerifying', { filename }),
         work: (context) => services.restore.verify(filename, context) });
       accepted(response, operation);
     } catch (error) { next(error); }
@@ -153,7 +159,7 @@ export function createApp({ config, operationManager, services = {} }) {
       const input = { filename: request.body.filename, targetMode: request.body.targetMode,
         targetDatabase: request.body.targetDatabase?.trim(), allowOverwrite: request.body.allowOverwrite === 'on',
         disconnectUsers: request.body.disconnectUsers === 'on' };
-      const operation = operationManager.tryStart({ type: 'restore', summary: 'Przygotowanie odtwarzania',
+      const operation = operationManager.tryStart({ type: 'restore', summary: message('operation.summary.restorePreparing'),
         work: (context) => services.restore.restore(input, context) });
       accepted(response, operation);
     } catch (error) { next(error); }
@@ -161,11 +167,11 @@ export function createApp({ config, operationManager, services = {} }) {
   app.post('/databases/delete', protectMutation, (request, response, next) => {
     try {
       const databaseName = request.body.databaseName?.trim();
-      if (request.body.confirmDelete !== 'yes') throw new ValidationError('Potwierdź usunięcie bazy danych.');
+      if (request.body.confirmDelete !== 'yes') throw new ValidationError(message('validation.databaseDeleteConfirmationRequired'));
       const operation = operationManager.tryStart({ type: 'delete-database',
-        summary: `Usuwanie bazy ${databaseName}`,
+        summary: message('operation.summary.databaseDeleting', { databaseName }),
         work: async (context) => {
-          context.updatePhase('deleting', `Usuwanie bazy ${databaseName}`);
+          context.updatePhase('deleting', message('operation.summary.databaseDeleting', { databaseName }));
           return services.database.deleteDatabase(databaseName);
         } });
       accepted(response, operation);
@@ -175,12 +181,12 @@ export function createApp({ config, operationManager, services = {} }) {
     try {
       const databaseName = request.body.databaseName?.trim();
       const mode = request.body.mode;
-      if (request.body.confirmShrinkLog !== 'yes') throw new ValidationError('Potwierdź zmniejszenie logu bazy.');
-      if (!['safe', 'aggressive'].includes(mode)) throw new ValidationError('Nieprawidłowy tryb zmniejszania logu.');
+      if (request.body.confirmShrinkLog !== 'yes') throw new ValidationError(message('validation.databaseShrinkConfirmationRequired'));
+      if (!['safe', 'aggressive'].includes(mode)) throw new ValidationError(message('validation.databaseShrinkModeInvalid'));
       const operation = operationManager.tryStart({ type: 'shrink-log',
-        summary: `Zmniejszanie logu bazy ${databaseName}`,
+        summary: message('operation.summary.databaseLogShrinking', { databaseName }),
         work: async (context) => {
-          context.updatePhase('shrinking-log', `Zmniejszanie logu bazy ${databaseName}`);
+          context.updatePhase('shrinking-log', message('operation.summary.databaseLogShrinking', { databaseName }));
           return services.database.shrinkTransactionLog(databaseName, mode, { enabled: config.enableShrinkLog });
         } });
       accepted(response, operation);
@@ -192,12 +198,12 @@ export function createApp({ config, operationManager, services = {} }) {
       filename: (request, file, callback) => callback(null, `${randomUUID()}.part`) }),
       limits: { fileSize: config.maxUploadBytes, files: 1 } }).single('backupFile');
     app.post('/files/upload', upload, protectMutation, (request, response, next) => {
-      if (!request.file) return next(new ValidationError('Wybierz plik do przesłania.'));
+      if (!request.file) return next(new ValidationError(message('validation.uploadFileRequired')));
       let filename;
       try { filename = decodeURIComponent(request.file.originalname); }
       catch { filename = request.file.originalname; }
       try {
-        const operation = operationManager.tryStart({ type: 'upload', summary: `Zapisywanie ${filename}`,
+        const operation = operationManager.tryStart({ type: 'upload', summary: message('operation.summary.fileSaving', { filename }),
           work: async () => {
             try { await services.files.publish(request.file.path, filename); return { filename }; }
             catch (error) { const { unlink } = await import('node:fs/promises'); await unlink(request.file.path).catch(() => {}); throw error; }
@@ -219,10 +225,10 @@ export function createApp({ config, operationManager, services = {} }) {
     app.post('/files/delete', protectMutation, (request, response, next) => {
       try {
         const filename = request.body.filename;
-        if (request.body.confirmDelete !== 'yes') throw new ValidationError('Potwierdź usunięcie pliku.');
-        const operation = operationManager.tryStart({ type: 'delete-file', summary: `Usuwanie ${filename}`,
+        if (request.body.confirmDelete !== 'yes') throw new ValidationError(message('validation.fileDeleteConfirmationRequired'));
+        const operation = operationManager.tryStart({ type: 'delete-file', summary: message('operation.summary.fileDeleting', { filename }),
           work: async (context) => {
-            context.updatePhase('deleting', `Usuwanie ${filename}`);
+            context.updatePhase('deleting', message('operation.summary.fileDeleting', { filename }));
             return services.files.delete(filename);
           } });
         accepted(response, operation);
@@ -250,7 +256,7 @@ export function createApp({ config, operationManager, services = {} }) {
         enableShrinkLog: config.enableShrinkLog,
         sqlEnvironment: environmentResult,
         files,
-        operation: operationManager.getStatus(),
+        operation: localizeOperation(operationManager.getStatus(), response.locals),
         maxUploadBytes: config.maxUploadBytes,
         csrfToken,
         refreshData: false,

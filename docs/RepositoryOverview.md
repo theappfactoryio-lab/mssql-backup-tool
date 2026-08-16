@@ -104,6 +104,10 @@ The most important environment variables are:
 |---|---:|---|
 | `PORT` | `8080` | Application HTTP port |
 | `PUBLIC_ORIGIN` | `http://localhost:8080` | Public origin used to validate state-changing requests |
+| `APP_LANGUAGE` | `en` | Default UI and application-log language: `en`, `de`, `es`, or `pl`. A browser selection stored in a cookie overrides this UI default. |
+| `AUTH_ENABLED` | `true` | Enables HTTP Basic Auth for every endpoint except `/health` |
+| `AUTH_USERNAME` | required when enabled | Shared web interface username |
+| `AUTH_PASSWORD` | required when enabled | Shared web interface password |
 | `MSSQL_HOST` | `mssql` | SQL Server hostname |
 | `MSSQL_PORT` | `1433` | SQL Server TCP port |
 | `MSSQL_USER` | `sa` | SQL Server login used by the application |
@@ -123,13 +127,20 @@ The application and SQL Server must have access to the same backup files. The ex
 
 ## Available tags
 
-- `0.1.0` — fixed version
-- `latest` — latest stable release
+Docker images are published to `theappfactoryio/mssql-backup-tool` with the following tags:
 
-For reproducible deployments, use a specific version instead of `latest`:
+- `latest` — the most recent image built from the `main` branch
+- `1.2.3` — an exact release version
+- `1.2` — the most recent patch release in the `1.2` series
+- `1` — the most recent release in the `1` major-version series
+- `sha-<commit>` — an image built from a specific Git commit
+
+Version tags are generated when a Git tag in the `vMAJOR.MINOR.PATCH` format, such as `v1.2.3`, is pushed to the repository.
+
+For reproducible deployments, use an exact version instead of `latest`, a major tag, or a minor tag:
 
 ```yaml
-image: <docker-hub-account>/mssql-backup-tool:0.1.0
+image: theappfactoryio/mssql-backup-tool:1.2.3
 ```
 
 ## Security recommendations

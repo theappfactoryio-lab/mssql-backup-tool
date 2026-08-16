@@ -1,4 +1,6 @@
-Poniżej znajduje się uporządkowany opis planowanej aplikacji, zgodny z dotychczasowymi ustaleniami. Zakres został celowo ograniczony do prostego narzędzia działającego w jednym kontenerze, bez logowania, kolejki, audytu, bazy konfiguracyjnej i innych elementów niewymaganych w pierwszej wersji.
+Poniżej znajduje się uporządkowany opis planowanej aplikacji, zgodny z dotychczasowymi ustaleniami. Zakres został celowo ograniczony do prostego narzędzia działającego w jednym kontenerze, z jednym wspólnym kontem HTTP Basic Auth, bez kolejki, audytu, bazy konfiguracyjnej i innych elementów niewymaganych w pierwszej wersji.
+
+Interfejs, walidacja, komunikaty operacji i logi aplikacji obsługują język angielski, niemiecki, hiszpański i polski. Angielski jest domyślny; administrator może zmienić domyślny język przez `APP_LANGUAGE`, a użytkownik przez selektor UI zapamiętywany w cookie. Techniczne identyfikatory i surowe komunikaty SQL Server pozostają niezmienione.
 
 MSSQLBackupTool
 Opis aplikacji
@@ -437,18 +439,20 @@ docker logs sql-backup-tool
 
 Poziom logowania powinien być ograniczony. W logach nie powinny pojawiać się hasła ani pełne dane połączenia.
 
-2.16. Brak uwierzytelniania
+2.16. Proste uwierzytelnianie
+
+Aplikacja używa jednego współdzielonego konta HTTP Basic Auth konfigurowanego przez `AUTH_USERNAME` i `AUTH_PASSWORD`. Ochrona jest domyślnie włączona i może zostać jawnie wyłączona przez `AUTH_ENABLED=false`. Publiczny pozostaje wyłącznie endpoint `GET /health` używany przez healthcheck.
 
 Aplikacja nie będzie miała:
 
-ekranu logowania,
-użytkowników,
+dedykowanego ekranu logowania,
+zarządzania użytkownikami,
 ról,
 sesji użytkowników,
 integracji z Entra ID,
 tokenów dostępowych.
 
-Dostęp do aplikacji będzie ograniczony na poziomie sieci lub konfiguracji Dockera.
+Poza localhost wymagane jest HTTPS, ponieważ Basic Auth nie szyfruje danych logowania.
 
 2.17. Kontener Docker
 
@@ -720,10 +724,10 @@ http://localhost:8080
 
 Zgodnie z ustaleniami aplikacja nie będzie posiadała:
 
-systemu logowania,
-użytkowników,
+dedykowanego ekranu logowania,
+zarządzania użytkownikami,
 ról,
-uwierzytelniania,
+sesji użytkowników,
 audytu,
 trwałej historii operacji,
 trwałych logów aplikacyjnych,
@@ -808,10 +812,10 @@ Decyzja: Urzytkownik musi zaznaczyć świadomie Automatyczne rozłaczenie i/lub 
 
 5.7. Dostęp sieciowy
 
-Ponieważ aplikacja nie posiada uwierzytelniania, należy zdecydować, czy port będzie:
+Aplikacja posiada proste HTTP Basic Auth, ale przy dostępie sieciowym nadal wymaga HTTPS oraz odpowiedniego ograniczenia ekspozycji. Port może być:
 
 dostępny tylko lokalnie,
-dostępny w wewnętrznej sieci,
+dostępny w wewnętrznej sieci przez reverse proxy HTTPS,
 dostępny przez VPN.
 
 Najprostsze ograniczenie lokalne:

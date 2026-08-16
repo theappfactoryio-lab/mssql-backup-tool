@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import { createGunzip } from 'node:zlib';
 import yauzl from 'yauzl';
 import { AppError } from '../errors/app-error.js';
+import { message } from '../i18n/index.js';
 
 function limiter(maxBytes) {
   let total = 0;
@@ -12,9 +13,9 @@ function limiter(maxBytes) {
     transform(chunk, encoding, callback) {
       total += chunk.length;
       if (total > maxBytes) {
-        callback(new AppError('Przekroczono limit rozpakowania.', {
+        callback(new AppError('Extraction limit exceeded.', {
           code: 'EXTRACT_LIMIT', statusCode: 422,
-          userMessage: 'Rozpakowany backup przekracza dozwolony rozmiar.',
+          publicMessage: message('errors.backupExtractedSizeExceeded'),
         }));
       } else callback(null, chunk);
     },
@@ -59,9 +60,9 @@ export async function extractZip(sourcePath, targetPath, { maxBytes, maxCompress
       const entries = [];
       zip.on('entry', (item) => {
         entries.push(item);
-        if (entries.length > 1) return reject(new AppError('Archiwum ma wiele wpisów.', {
+        if (entries.length > 1) return reject(new AppError('Archive has multiple entries.', {
           code: 'INVALID_ZIP', statusCode: 422,
-          userMessage: 'Archiwum ZIP musi zawierać dokładnie jeden plik .bak.',
+          publicMessage: message('errors.zipSingleBakRequired'),
         }));
         zip.readEntry();
       });
@@ -73,8 +74,8 @@ export async function extractZip(sourcePath, targetPath, { maxBytes, maxCompress
     const encrypted = Boolean(entry.generalPurposeBitFlag & 0x1);
     const ratio = entry?.compressedSize === 0 ? Infinity : entry.uncompressedSize / entry.compressedSize;
     if (invalidName || encrypted || entry.uncompressedSize > maxBytes || ratio > maxCompressionRatio) {
-      throw new AppError('Nieprawidłowy ZIP.', { code: 'INVALID_ZIP', statusCode: 422,
-        userMessage: 'Archiwum ZIP jest nieobsługiwane lub przekracza limity bezpieczeństwa.' });
+      throw new AppError('Invalid ZIP.', { code: 'INVALID_ZIP', statusCode: 422,
+        publicMessage: message('errors.zipUnsupportedOrUnsafe') });
     }
     const source = await openEntry(zip, entry);
     await pipeline(source, limiter(maxBytes), createWriteStream(targetPath, { flags: 'wx' }));

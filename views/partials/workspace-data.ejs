@@ -7,6 +7,6 @@
 <datalist id="database-options" hx-swap-oob="outerHTML">
   <% for (const database of databases) { %><option value="<%= database %>"></option><% } %>
 </datalist>
-<span id="file-count" hx-swap-oob="outerHTML"><%= files.length %> plików na współdzielonym wolumenie</span>
+<span id="file-count" hx-swap-oob="outerHTML"><%= t('files.sharedVolumeCount', { count: formatNumber(files.length) }) %></span>
 <%- include('database-data', { databaseDetails, databasesAvailable, csrfToken, enableShrinkLog, oob: true }) %>
 <%- include('file-table', { files, csrfToken, oob: true }) %>

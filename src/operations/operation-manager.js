@@ -1,23 +1,36 @@
 import { randomUUID } from 'node:crypto';
+import { isMessageDescriptor, message } from '../i18n/index.js';
 
 const MAX_EVENTS = 200;
 const MAX_MESSAGE_LENGTH = 500;
 const LEVELS = new Set(['info', 'warning', 'error', 'success']);
 const SOURCES = new Set(['application', 'sql-server', 'upload']);
 
-function safeMessage(value) {
+function safeText(value) {
   return String(value ?? '')
-    .replace(/(password|pwd|token|secret)\s*[=:]\s*[^\s;,]+/gi, '$1=[ukryto]')
-    .replace(/[A-Z]:\\[^\r\n"']+/gi, '[ścieżka ukryta]')
+    .replace(/(password|pwd|token|secret)\s*[=:]\s*[^\s;,]+/gi, '$1=[REDACTED]')
+    .replace(/[A-Z]:\\[^\r\n"']+/gi, '[PATH REDACTED]')
     .slice(0, MAX_MESSAGE_LENGTH);
+}
+
+function safeMessage(value) {
+  if (!isMessageDescriptor(value)) return { raw: safeText(value?.raw ?? value) };
+  const params = Object.fromEntries(Object.entries(value.params ?? {}).map(([key, parameter]) => [
+    key,
+    typeof parameter === 'number' && Number.isFinite(parameter) ? parameter
+      : typeof parameter === 'boolean' || parameter === null ? parameter : safeText(parameter),
+  ]));
+  return message(safeText(value.key), params);
 }
 
 export class OperationBusyError extends Error {
   constructor(operation) {
-    super('Inna operacja jest już wykonywana.');
+    super('Another operation is already running.');
     this.name = 'OperationBusyError';
     this.code = 'OPERATION_BUSY';
     this.statusCode = 409;
+    this.publicMessage = message('operation.busy');
+    this.userMessage = this.publicMessage;
     this.operation = operation;
   }
 }
@@ -102,7 +115,7 @@ export class OperationManager {
         operation.status = 'succeeded';
         operation.progress = 100;
         operation.result = result ?? null;
-        addEvent({ level: 'success', message: 'Operacja zakończyła się powodzeniem.', progress: 100 });
+        addEvent({ level: 'success', message: message('operation.completedSuccessfully'), progress: 100 });
       })
       .catch((error) => {
         const cause = error?.cause?.stack ? `\nCaused by: ${error.cause.stack}` : '';
@@ -110,7 +123,7 @@ export class OperationManager {
         operation.status = 'failed';
         operation.error = {
           code: error?.code ?? 'UNEXPECTED_ERROR',
-          message: safeMessage(error?.userMessage ?? 'Operacja nie powiodła się.'),
+          message: safeMessage(error?.publicMessage ?? error?.userMessage ?? message('operation.failed')),
         };
         addEvent({ level: 'error', message: operation.error.message });
       })

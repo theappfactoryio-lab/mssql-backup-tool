@@ -1,6 +1,7 @@
 import sql from 'mssql';
 import { quoteIdentifier, unicodeSqlLiteral } from './sql-escaping.js';
 import { AppError, ValidationError } from '../errors/app-error.js';
+import { message } from '../i18n/index.js';
 
 // Official mapping: https://learn.microsoft.com/en-us/troubleshoot/sql/releases/download-and-install-latest-updates
 const SQL_SERVER_RELEASES = new Map([
@@ -122,7 +123,7 @@ export class DatabaseRepository {
     request.input('name', sql.NVarChar(128), name);
     const result = await request.query('SELECT name FROM sys.databases WHERE name = @name');
     const canonical = result.recordset[0]?.name ?? null;
-    if (mustExist && !canonical) throw new ValidationError('Wybrana baza danych nie istnieje.');
+    if (mustExist && !canonical) throw new ValidationError(message('validation.databaseNotFound'));
     return canonical;
   }
 
@@ -130,7 +131,7 @@ export class DatabaseRepository {
     const canonical = await this.canonicalDatabaseName(databaseName);
     const request = await this.request();
     request.input('backupPath', sql.NVarChar(4000), sqlPath);
-    attachSqlProgress(request, operation, 'Zapisywanie backupu');
+    attachSqlProgress(request, operation, 'operation.progress.backupWriting');
     const compression = nativeCompression ? ', COMPRESSION' : '';
     await request.query(`BACKUP DATABASE ${quoteIdentifier(canonical)} TO DISK = @backupPath
       WITH COPY_ONLY, INIT, CHECKSUM, STATS = 10${compression}`);
@@ -142,7 +143,7 @@ export class DatabaseRepository {
     const result = await request.query(`SELECT name FROM sys.databases
       WHERE name = @name AND database_id > 4 AND source_database_id IS NULL`);
     const canonical = result.recordset[0]?.name;
-    if (!canonical) throw new ValidationError('Wybrana baza użytkownika nie istnieje.');
+    if (!canonical) throw new ValidationError(message('validation.userDatabaseNotFound'));
     const identifier = quoteIdentifier(canonical);
     await (await this.request()).query(`ALTER DATABASE ${identifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
       DROP DATABASE ${identifier};`);
@@ -150,11 +151,11 @@ export class DatabaseRepository {
   }
 
   async shrinkTransactionLog(databaseName, mode, { enabled = false } = {}) {
-    if (!enabled) throw new AppError('Zmniejszanie logów jest wyłączone.', {
+    if (!enabled) throw new AppError('Log shrinking is disabled.', {
       code: 'SHRINK_LOG_DISABLED', statusCode: 403,
-      userMessage: 'Zmniejszanie logów jest wyłączone w konfiguracji aplikacji.',
+      publicMessage: message('errors.databaseShrinkDisabled'),
     });
-    if (!['safe', 'aggressive'].includes(mode)) throw new ValidationError('Nieprawidłowy tryb zmniejszania logu.');
+    if (!['safe', 'aggressive'].includes(mode)) throw new ValidationError(message('validation.databaseShrinkModeInvalid'));
 
     const lookup = await this.request();
     lookup.input('name', sql.NVarChar(128), databaseName);
@@ -163,7 +164,7 @@ export class DatabaseRepository {
       FROM sys.databases WHERE name = @name AND database_id > 4
         AND source_database_id IS NULL AND state_desc = N'ONLINE' AND is_read_only = 0`);
     const database = databaseResult.recordset[0];
-    if (!database) throw new ValidationError('Baza nie istnieje albo nie jest dostępna do zapisu w stanie ONLINE.');
+    if (!database) throw new ValidationError(message('validation.databaseUnavailableForWrite'));
 
     const identifier = quoteIdentifier(database.name);
     const readLogFiles = async () => (await (await this.request()).query(`USE ${identifier};
@@ -172,8 +173,8 @@ export class DatabaseRepository {
       fileId: Number(row.fileId), name: row.name, sizeBytes: Number(row.sizeBytes),
     }));
     const before = await readLogFiles();
-    if (!before.length) throw new AppError('Nie znaleziono plików logu.', {
-      code: 'SHRINK_LOG_FILES_UNAVAILABLE', userMessage: 'Nie można odczytać plików logu wybranej bazy.',
+    if (!before.length) throw new AppError('No log files found.', {
+      code: 'SHRINK_LOG_FILES_UNAVAILABLE', publicMessage: message('errors.databaseLogFilesUnavailable'),
     });
 
     const originalModel = database.recoveryModel;
@@ -202,10 +203,9 @@ export class DatabaseRepository {
     }
 
     if (operationError || restoreError) {
-      const reason = restoreError ? ' Nie udało się przywrócić poprzedniego modelu odzyskiwania.' : '';
-      throw new AppError(`Zmniejszanie logu nie powiodło się.${reason}`, {
+      throw new AppError(restoreError ? 'Log shrinking failed and recovery model restoration failed.' : 'Log shrinking failed.', {
         code: restoreError ? 'SHRINK_LOG_RECOVERY_MODEL_FAILED' : 'SHRINK_LOG_FAILED',
-        userMessage: `Nie udało się zmniejszyć logu bazy.${reason}`,
+        publicMessage: message(restoreError ? 'errors.databaseShrinkFailedRecoveryModel' : 'errors.databaseShrinkFailed'),
         cause: restoreError ?? operationError,
       });
     }
@@ -235,7 +235,7 @@ export class DatabaseRepository {
     const result = await request.query('RESTORE HEADERONLY FROM DISK = @backupPath');
     const full = result.recordset.filter((row) => Number(row.BackupType) === 1);
     if (result.recordset.length !== 1 || full.length !== 1 || Number(full[0].FamilyCount ?? 1) !== 1) {
-      throw new ValidationError('Obsługiwany jest jeden pełny backup zapisany w jednym pliku.');
+      throw new ValidationError(message('validation.backupSingleFullSetRequired'));
     }
     return full[0];
   }
@@ -272,25 +272,25 @@ export class DatabaseRepository {
     const values = targets.map((_, index) => `@path${index}`).join(', ');
     const result = await request.query(`SELECT physical_name FROM sys.master_files
       WHERE physical_name IN (${values}) AND DB_NAME(database_id) <> @targetDatabase`);
-    if (result.recordset.length) throw new ValidationError('Docelowa ścieżka pliku jest używana przez inną bazę.');
+    if (result.recordset.length) throw new ValidationError(message('validation.restoreTargetPathInUse'));
   }
 
   async restore({ targetDatabase, sqlPath, position, mapping, replace, disconnectUsers, operation = null }) {
     const exists = await this.canonicalDatabaseName(targetDatabase, { mustExist: false });
-    if (replace && !exists) throw new ValidationError('Baza wybrana do nadpisania nie istnieje.');
-    if (!replace && exists) throw new ValidationError('Baza docelowa już istnieje.');
+    if (replace && !exists) throw new ValidationError(message('validation.restoreOverwriteDatabaseMissing'));
+    if (!replace && exists) throw new ValidationError(message('validation.restoreTargetDatabaseExists'));
     const identifier = quoteIdentifier(exists ?? targetDatabase);
     const singleUser = replace && disconnectUsers
       ? `ALTER DATABASE ${identifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n`
       : '';
-    if (singleUser) operation?.log('Rozłączanie aktywnych sesji bazy.');
+    if (singleUser) operation?.log(message('operation.event.databaseSessionsDisconnecting'));
     const moves = mapping.map((item) =>
       `MOVE ${unicodeSqlLiteral(item.logicalName)} TO ${unicodeSqlLiteral(item.targetPath)}`).join(',\n');
     const options = [`FILE = ${Number(position)}`, moves, 'RECOVERY', 'STATS = 10'];
     if (replace) options.push('REPLACE');
     const request = await this.request();
     request.input('backupPath', sql.NVarChar(4000), sqlPath);
-    attachSqlProgress(request, operation, 'Odtwarzanie bazy');
+    attachSqlProgress(request, operation, 'operation.progress.databaseRestoring');
     try {
       await request.query(`USE [master];\n${singleUser}RESTORE DATABASE ${identifier}
         FROM DISK = @backupPath WITH ${options.join(',\n')}`);
@@ -300,13 +300,13 @@ export class DatabaseRepository {
           IF DB_ID(${unicodeSqlLiteral(exists)}) IS NOT NULL
             AND DATABASEPROPERTYEX(${unicodeSqlLiteral(exists)}, 'Status') <> 'RESTORING'
             ALTER DATABASE ${identifier} SET MULTI_USER`).catch(() => {});
-        operation?.log('Przywrócono tryb wielu użytkowników.');
+        operation?.log(message('operation.event.databaseMultiUserRestored'));
       }
     }
   }
 }
 
-function attachSqlProgress(request, operation, label) {
+function attachSqlProgress(request, operation, messageKey) {
   if (!operation || typeof request.on !== 'function') return;
   let lastProgress = -1;
   request.on('info', (info) => {
@@ -315,7 +315,7 @@ function attachSqlProgress(request, operation, label) {
     const progress = Number(match[1]);
     if (!Number.isFinite(progress) || progress === lastProgress) return;
     lastProgress = progress;
-    operation.reportProgress(progress, `${label}: ${progress}%`, { source: 'sql-server' });
+    operation.reportProgress(progress, message(messageKey, { progress }), { source: 'sql-server' });
   });
 }
 
@@ -325,10 +325,10 @@ export function mapSqlError(error) {
     .filter((item, index, items) => items.findIndex((candidate) => candidate.message === item.message) === index);
   const sqlMessage = sqlErrors.map((item) => item.message).join(' ');
   if (sqlErrors.some((item) => item.number === 3169)) return new AppError(sqlMessage, { code: 'SQL_VERSION_MISMATCH',
-    userMessage: 'Backup pochodzi z niezgodnej wersji SQL Server.', cause: error });
+    publicMessage: message('errors.sql.versionMismatch'), cause: error });
   if (error?.code === 'EREQUEST' || Number.isInteger(error?.number)) {
     return new AppError(sqlMessage, { code: 'SQL_RESTORE_FAILED',
-      userMessage: `SQL Server odrzucił operację: ${sqlMessage}`, cause: error });
+      publicMessage: message('errors.sql.operationRejected', { detail: sqlMessage }), cause: error });
   }
   return error;
 }

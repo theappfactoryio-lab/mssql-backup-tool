@@ -52,12 +52,12 @@ test('zapisuje bezpieczny błąd i zawsze zwalnia blokadę', async () => {
   assert.equal(manager.getStatus().phase, 'backing-up');
   assert.deepEqual(manager.getStatus().error, {
     code: 'BACKUP_FAILED',
-    message: 'Nie udało się wykonać backupu.',
+    message: { raw: 'Nie udało się wykonać backupu.' },
   });
-  assert.equal(manager.getStatus().error.message.includes('sekret'), false);
+  assert.equal(manager.getStatus().error.message.raw.includes('sekret'), false);
   assert.match(logged[0], /BACKUP_FAILED.*sekret techniczny/s);
   assert.equal(manager.getStatus().events.at(-1).level, 'error');
-  assert.equal(manager.getStatus().events.at(-1).message, 'Nie udało się wykonać backupu.');
+  assert.deepEqual(manager.getStatus().events.at(-1).message, { raw: 'Nie udało się wykonać backupu.' });
   assert.equal(manager.isBusy(), false);
 });
 

@@ -1,10 +1,11 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { ValidationError } from '../errors/app-error.js';
+import { message } from '../i18n/index.js';
 
 function safeStem(databaseName) {
   if (typeof databaseName !== 'string' || !databaseName.trim()) {
-    throw new ValidationError('Nieprawidłowa nazwa bazy docelowej.');
+    throw new ValidationError(message('validation.restoreTargetDatabaseNameInvalid'));
   }
   const name = databaseName.trim();
   const basic = name.normalize('NFKD').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60) || 'database';
@@ -13,7 +14,7 @@ function safeStem(databaseName) {
 }
 
 export function buildRestoreMapping(fileList, databaseName, { dataPath, logPath }) {
-  if (!Array.isArray(fileList) || fileList.length === 0) throw new ValidationError('Backup nie zawiera listy plików.');
+  if (!Array.isArray(fileList) || fileList.length === 0) throw new ValidationError(message('validation.backupFileListMissing'));
   const stem = safeStem(databaseName);
   let dataIndex = 0;
   let logIndex = 0;
@@ -27,6 +28,6 @@ export function buildRestoreMapping(fileList, databaseName, { dataPath, logPath 
       logIndex += 1;
       return { logicalName: file.LogicalName, targetPath: path.posix.join(logPath, `${stem}.log${logIndex}.ldf`) };
     }
-    throw new ValidationError(`Nieobsługiwany typ pliku backupu: ${file.Type}.`);
+    throw new ValidationError(message('validation.backupFileTypeUnsupported', { fileType: file.Type }));
   });
 }
