@@ -99,6 +99,41 @@ test('weryfikuje backup bez metadanych CHECKSUM', async () => {
   assert.doesNotMatch(queries[1], /CHECKSUM/);
 });
 
+test('odtwarza istniejącą bazę z sesji master i rozłącza ją w tym samym batchu', async () => {
+  const queries = [];
+  const pool = {
+    connected: true,
+    request: () => ({
+      input() { return this; },
+      on() { return this; },
+      async query(query) {
+        queries.push(query);
+        if (query.includes('SELECT name FROM sys.databases')) return { recordset: [{ name: 'Demo' }] };
+        return { recordset: [] };
+      },
+    }),
+  };
+
+  await new DatabaseRepository(pool).restore({
+    targetDatabase: 'Demo',
+    sqlPath: '/backup/demo.bak',
+    position: 1,
+    mapping: [
+      { logicalName: 'Demo', targetPath: '/data/demo.mdf' },
+      { logicalName: 'Demo_log', targetPath: '/data/demo.ldf' },
+    ],
+    replace: true,
+    disconnectUsers: true,
+  });
+
+  const restoreBatch = queries.find((query) => query.includes('RESTORE DATABASE'));
+  const cleanupBatch = queries.find((query) => query.includes('SET MULTI_USER'));
+  assert.match(restoreBatch,
+    /^USE \[master\];[\s\S]*ALTER DATABASE \[Demo\] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;[\s\S]*RESTORE DATABASE \[Demo\]/);
+  assert.equal(queries.filter((query) => query.includes('SET SINGLE_USER')).length, 1);
+  assert.match(cleanupBatch, /^USE \[master\];/);
+});
+
 test('scala podstawowe i opcjonalne metadane baz', async () => {
   const pool = {
     connected: true,

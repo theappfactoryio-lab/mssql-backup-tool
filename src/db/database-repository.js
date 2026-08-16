@@ -280,10 +280,10 @@ export class DatabaseRepository {
     if (replace && !exists) throw new ValidationError('Baza wybrana do nadpisania nie istnieje.');
     if (!replace && exists) throw new ValidationError('Baza docelowa już istnieje.');
     const identifier = quoteIdentifier(exists ?? targetDatabase);
-    if (replace && disconnectUsers) {
-      operation?.log('Rozłączanie aktywnych sesji bazy.');
-      await (await this.request()).query(`ALTER DATABASE ${identifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE`);
-    }
+    const singleUser = replace && disconnectUsers
+      ? `ALTER DATABASE ${identifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n`
+      : '';
+    if (singleUser) operation?.log('Rozłączanie aktywnych sesji bazy.');
     const moves = mapping.map((item) =>
       `MOVE ${unicodeSqlLiteral(item.logicalName)} TO ${unicodeSqlLiteral(item.targetPath)}`).join(',\n');
     const options = [`FILE = ${Number(position)}`, moves, 'RECOVERY', 'STATS = 10'];
@@ -292,12 +292,14 @@ export class DatabaseRepository {
     request.input('backupPath', sql.NVarChar(4000), sqlPath);
     attachSqlProgress(request, operation, 'Odtwarzanie bazy');
     try {
-      await request.query(`RESTORE DATABASE ${identifier} FROM DISK = @backupPath WITH ${options.join(',\n')}`);
+      await request.query(`USE [master];\n${singleUser}RESTORE DATABASE ${identifier}
+        FROM DISK = @backupPath WITH ${options.join(',\n')}`);
     } finally {
       if (replace && disconnectUsers) {
-        await (await this.request()).query(`IF DB_ID(${unicodeSqlLiteral(exists)}) IS NOT NULL
-          AND DATABASEPROPERTYEX(${unicodeSqlLiteral(exists)}, 'Status') <> 'RESTORING'
-          ALTER DATABASE ${identifier} SET MULTI_USER`).catch(() => {});
+        await (await this.request()).query(`USE [master];
+          IF DB_ID(${unicodeSqlLiteral(exists)}) IS NOT NULL
+            AND DATABASEPROPERTYEX(${unicodeSqlLiteral(exists)}, 'Status') <> 'RESTORING'
+            ALTER DATABASE ${identifier} SET MULTI_USER`).catch(() => {});
         operation?.log('Przywrócono tryb wielu użytkowników.');
       }
     }
