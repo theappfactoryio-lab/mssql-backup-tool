@@ -1,0 +1,4 @@
+<div id="files-section-data">
+  <%- include('file-table', { files, csrfToken, oob: false }) %>
+</div>
+<span id="file-count" hx-swap-oob="outerHTML"><%= files.length %> plików na współdzielonym wolumenie</span>

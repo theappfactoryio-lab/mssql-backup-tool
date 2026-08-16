@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MSSQLBackupTool</title>
+  <script>
+    try {
+      const savedTheme = document.cookie.match(/(?:^|;\s*)theme=(dark|light)(?:;|$)/)?.[1];
+      const theme = savedTheme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      const accent = document.cookie.match(/(?:^|;\s*)accent=(red|blue)(?:;|$)/)?.[1] ?? 'blue';
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.accent = accent;
+    } catch {}
+  </script>
+  <link rel="stylesheet" href="/public/app.css">
+  <script src="https://unpkg.com/htmx.org@2.0.10"></script>
+  <script src="/public/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div><span class="product-mark">MS</span><strong>MSSQLBackupTool</strong></div>
+    <div class="topbar__actions">
+      <span class="environment">Lokalny SQL Server</span>
+      <button class="accent-toggle" type="button" data-accent-toggle aria-label="Zmień kolor podstawowy na czerwony" aria-pressed="true" title="Zmień kolor podstawowy na czerwony">
+        <span class="accent-toggle__swatch" aria-hidden="true"></span>
+      </button>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Włącz ciemny motyw" aria-pressed="false" title="Włącz ciemny motyw">
+        <span class="theme-toggle__light" aria-hidden="true">☀</span>
+        <span class="theme-toggle__dark" aria-hidden="true">☾</span>
+      </button>
+    </div>
+  </header>
+  <main class="workspace">
+    <%- include('partials/operation-status', { operation }) %>
+    <div class="forms-grid">
+      <section class="panel">
+        <h1>Wykonaj backup</h1>
+        <form hx-post="/operations/backup" hx-target="#operation-dialog-host" hx-swap="outerHTML">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label for="databaseName">Baza danych</label>
+          <select id="databaseName" name="databaseName" required>
+            <% for (const database of databases) { %><option><%= database %></option><% } %>
+          </select>
+          <fieldset><legend>Kompresja</legend>
+            <label><input type="radio" name="compression" value="none" checked> Bez kompresji</label>
+            <label><input type="radio" name="compression" value="native"> Natywna MSSQL</label>
+            <label><input type="radio" name="compression" value="zip"> ZIP</label>
+            <label><input type="radio" name="compression" value="gzip"> GZIP</label>
+          </fieldset>
+          <button class="button button--primary" type="submit">Wykonaj backup</button>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Odtwórz bazę</h2>
+        <form hx-post="/operations/restore" hx-target="#operation-dialog-host" hx-swap="outerHTML">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label for="restoreFilename">Plik backupu</label>
+          <select id="restoreFilename" name="filename" required><% for (const file of files) { %><option><%= file.name %></option><% } %></select>
+          <fieldset><legend>Tryb docelowy</legend>
+            <label><input type="radio" name="targetMode" value="new" checked> Nowa baza</label>
+            <label><input type="radio" name="targetMode" value="existing"> Istniejąca baza</label>
+          </fieldset>
+          <label for="targetDatabaseInput">Nazwa bazy docelowej</label>
+          <input id="targetDatabaseInput" name="targetDatabase" list="database-options" maxlength="128" required>
+          <select id="targetDatabaseSelect" name="targetDatabase" style="display:none;" aria-hidden="true" required></select>
+          <datalist id="database-options"><% for (const database of databases) { %><option value="<%= database %>"></option><% } %></datalist>
+          <div class="warning"><strong>Uwaga:</strong> nadpisanie istniejącej bazy jest nieodwracalne.</div>
+          <label><input type="checkbox" name="allowOverwrite"> Zezwalam na nadpisanie istniejącej bazy</label>
+          <label><input type="checkbox" name="disconnectUsers"> Automatycznie rozłącz aktywne sesje</label>
+          <div class="button-row">
+            <button class="button button--secondary" type="submit" formaction="/operations/verify" hx-post="/operations/verify">Zweryfikuj</button>
+            <button class="button button--primary" type="submit">Zweryfikuj i odtwórz</button>
+          </div>
+        </form>
+      </section>
+    </div>
+    <section class="files-section">
+      <div class="section-heading"><div><h2>Pliki backupów</h2><p id="file-count"><%= files.length %> plików na współdzielonym wolumenie</p></div>
+        <div class="section-tools">
+          <form class="upload" enctype="multipart/form-data" hx-post="/files/upload" hx-target="#operation-dialog-host" hx-swap="outerHTML">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label class="button button--primary file-picker">
+              <span class="file-picker__text">Wybierz i prześlij plik</span>
+              <input type="file" name="backupFile" accept=".bak,.zip,.gz" required>
+            </label>
+            <div class="upload-progress" hidden aria-live="polite">
+              <span>Przesyłanie pliku: <strong class="upload-progress__value">0%</strong></span>
+              <progress value="0" max="100">0%</progress>
+            </div>
+          </form>
+          <button class="refresh-button" type="button" title="Odśwież listę plików" aria-label="Odśwież listę plików backupów"
+            hx-get="/partials/files" hx-target="#files-section-data" hx-swap="outerHTML">
+            <span class="refresh-button__icon" aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </div>
+      <div id="files-section-data"><%- include('partials/file-table', { files, csrfToken, oob: false }) %></div>
+    </section>
+    <section class="database-section" aria-labelledby="database-section-title">
+      <div class="section-heading"><div><h2 id="database-section-title">Bazy danych</h2><p>Rozmiary oznaczają przydzielone pliki. Shrink jest operacją wyjątkową dla środowisk developerskich.</p></div>
+        <div class="section-tools">
+          <span id="database-count" class="count-badge"><%= databasesAvailable ? databaseDetails.length : '—' %></span>
+          <button class="refresh-button" type="button" title="Odśwież listę baz danych" aria-label="Odśwież listę baz danych"
+            hx-get="/partials/databases" hx-target="#database-table-wrap" hx-swap="outerHTML">
+            <span class="refresh-button__icon" aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </div>
+      <% if (enableShrinkLog) { %><div class="database-warning"><strong>Uwaga:</strong> tryb agresywny przełącza bazę na SIMPLE, przerywa łańcuch backupów logu i może spowodować ponowny wzrost plików.</div><% } %>
+      <%- include('partials/database-data', { databaseDetails, databasesAvailable, csrfToken, enableShrinkLog, oob: false }) %>
+    </section>
+    <%- include('partials/sql-environment', { sqlEnvironment }) %>
+  </main>
+  <dialog class="operation-dialog confirmation-dialog" data-confirm-dialog aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message">
+    <div class="operation-dialog__header">
+      <span class="status-dot" aria-hidden="true"></span>
+      <div><h2 id="confirm-dialog-title" tabindex="-1">Potwierdź operację</h2><p id="confirm-dialog-message"></p></div>
+      <span class="operation-dialog__state">Potwierdzenie</span>
+    </div>
+    <div class="operation-dialog__footer confirmation-dialog__actions">
+      <button class="button button--secondary" type="button" data-confirm-cancel>Anuluj</button>
+      <button class="button button--danger" type="button" data-confirm-accept>Potwierdź</button>
+    </div>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,55 @@
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    volumes:
+      - backup-data:/var/opt/mssql/backup
+      - sql-data:/var/opt/mssql
+    ports:
+      - 1433:1433
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  sql-backup-tool:
+    image: mssql-backup-tool:latest
+    build: .
+    init: true
+    environment:
+      PORT: 8080
+      APP_HOST: 0.0.0.0
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
+      MSSQL_HOST: ${MSSQL_HOST:-mssql}
+      MSSQL_PORT: ${MSSQL_PORT:-1433}
+      MSSQL_USER: ${MSSQL_USER:-sa}
+      MSSQL_PASSWORD: ${MSSQL_PASSWORD:?Ustaw MSSQL_PASSWORD w pliku .env}
+      MSSQL_ENCRYPT: ${MSSQL_ENCRYPT:-false}
+      MSSQL_TRUST_SERVER_CERTIFICATE: ${MSSQL_TRUST_SERVER_CERTIFICATE:-true}
+      MSSQL_BACKUP_PATH: ${MSSQL_BACKUP_PATH:-/var/opt/mssql/backup}
+      MSSQL_DATA_PATH: ${MSSQL_DATA_PATH:-/var/opt/mssql/data}
+      MSSQL_LOG_PATH: ${MSSQL_LOG_PATH:-/var/opt/mssql/data}
+      APP_BACKUP_PATH: ${APP_BACKUP_PATH:-/app/backups}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-53687091200}
+      MAX_EXTRACTED_BYTES: ${MAX_EXTRACTED_BYTES:-107374182400}
+      MAX_COMPRESSION_RATIO: ${MAX_COMPRESSION_RATIO:-200}
+      TEMP_MAX_AGE_HOURS: ${TEMP_MAX_AGE_HOURS:-24}
+      ENABLE_SHRINK_LOG: ${ENABLE_SHRINK_LOG:-false}
+    volumes:
+      - backup-data:/app/backups
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      mssql:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backup-data:
+  sql-data:

@@ -1,0 +1,31 @@
+{
+  "name": "mssql-backup-tool",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "test:unit": "node --test test/unit/*.test.js",
+    "test:http": "node --test test/http/*.test.js",
+    "test:integration": "node --test test/integration/*.test.js"
+  },
+  "dependencies": {
+    "archiver": "^8.0.0",
+    "content-disposition": "^3.0.0",
+    "ejs": "^6.0.1",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    
+    "mssql": "^12.7.0",
+    "multer": "^2.2.0",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
+  }
+}

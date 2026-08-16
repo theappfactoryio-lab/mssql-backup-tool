@@ -1,0 +1,47 @@
+<section id="sql-environment" class="sql-environment-section" aria-labelledby="sql-environment-heading">
+  <div class="section-heading environment-heading">
+    <div>
+      <h2 id="sql-environment-heading">Środowisko SQL Server</h2>
+      <p>Informacje o aktualnym połączeniu i instancji bazy danych.</p>
+    </div>
+    <div class="section-tools">
+      <div class="connection-status connection-status--<%= sqlEnvironment.connected ? 'connected' : 'disconnected' %>"
+        role="status" aria-live="polite">
+        <span class="connection-status__dot" aria-hidden="true"></span>
+        <%= sqlEnvironment.connected ? 'Połączono' : 'Brak połączenia' %>
+      </div>
+      <button class="refresh-button" type="button" title="Odśwież informacje o środowisku"
+        aria-label="Odśwież informacje o środowisku SQL Server"
+        hx-get="/partials/sql-environment" hx-target="#sql-environment" hx-swap="outerHTML">
+        <span class="refresh-button__icon" aria-hidden="true">↻</span>
+      </button>
+    </div>
+  </div>
+
+  <% if (sqlEnvironment.connected) { %>
+    <dl class="environment-grid">
+      <div><dt>Serwer / instancja</dt><dd><%= sqlEnvironment.serverName || '—' %></dd></div>
+      <div>
+        <dt>Wersja
+          <a class="info-link" href="https://learn.microsoft.com/en-us/troubleshoot/sql/releases/download-and-install-latest-updates"
+            target="_blank" rel="noopener noreferrer"
+            title="Sprawdź historię wersji SQL Server w Microsoft Learn"
+            aria-label="Sprawdź historię wersji SQL Server w Microsoft Learn (otwiera nową kartę)">i</a>
+        </dt>
+        <dd><% if (sqlEnvironment.releaseName) { %><%= sqlEnvironment.releaseName %> · <% } %><%= sqlEnvironment.productVersion || '—' %><% if (sqlEnvironment.productLevel) { %> (<%= sqlEnvironment.productLevel %>)<% } %></dd>
+      </div>
+      <div><dt>Edycja</dt><dd><%= sqlEnvironment.edition || '—' %></dd></div>
+      <div><dt>Host</dt><dd><%= sqlEnvironment.machineName || '—' %></dd></div>
+      <div><dt>Baza połączenia</dt><dd><%= sqlEnvironment.databaseName || '—' %></dd></div>
+      <div><dt>Login</dt><dd><%= sqlEnvironment.loginName || '—' %></dd></div>
+      <div><dt>Transport</dt><dd><%= sqlEnvironment.netTransport || '—' %></dd></div>
+      <div><dt>Uwierzytelnianie</dt><dd><%= sqlEnvironment.authenticationScheme || '—' %></dd></div>
+      <div><dt>Skonfigurowany adres</dt><dd><%= sqlEnvironment.target %></dd></div>
+    </dl>
+  <% } else { %>
+    <div class="environment-unavailable">
+      <strong>Nie można nawiązać połączenia z SQL Serverem.</strong>
+      <p>Skonfigurowany adres: <span><%= sqlEnvironment.target %></span>. Stan zostanie sprawdzony ponownie automatycznie.</p>
+    </div>
+  <% } %>
+</section>

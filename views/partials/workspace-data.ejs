@@ -1,0 +1,12 @@
+<select id="databaseName" name="databaseName" required hx-swap-oob="outerHTML">
+  <% for (const database of databases) { %><option><%= database %></option><% } %>
+</select>
+<select id="restoreFilename" name="filename" required hx-swap-oob="outerHTML">
+  <% for (const file of files) { %><option><%= file.name %></option><% } %>
+</select>
+<datalist id="database-options" hx-swap-oob="outerHTML">
+  <% for (const database of databases) { %><option value="<%= database %>"></option><% } %>
+</datalist>
+<span id="file-count" hx-swap-oob="outerHTML"><%= files.length %> plików na współdzielonym wolumenie</span>
+<%- include('database-data', { databaseDetails, databasesAvailable, csrfToken, enableShrinkLog, oob: true }) %>
+<%- include('file-table', { files, csrfToken, oob: true }) %>
