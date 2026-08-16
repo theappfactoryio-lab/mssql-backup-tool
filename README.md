@@ -28,6 +28,10 @@ Panel będzie dostępny pod adresem <http://localhost:8080>. Port jest publikowa
 
 Konfigurację należy umieścić w pliku `.env` obok `compose.yaml`. Punktem wyjścia jest `.env.example`. Compose wczytuje ten plik automatycznie, a wartości podane bezpośrednio w środowisku procesu mają pierwszeństwo. Po zmianie konfiguracji kontenery należy odtworzyć poleceniem `docker compose up -d --build`.
 
+### Inicjalizacja wolumenu backupów
+
+Entrypoint obrazu aplikacji uruchamia się na moment jako `root`, tworzy katalogi `.incoming` i `.work` oraz ustawia dla nich właściciela `10001:0` i prawa `0770`. Następnie przez `su-exec` uruchamia Node.js jako nieuprzywilejowany użytkownik `10001:0`. Zapobiega to błędom `EACCES` dla nowych i istniejących wolumenów bez dodatkowego kontenera inicjalizacyjnego. Operacja nie wykonuje rekursywnej zmiany właściciela plików backupów.
+
 ### Usługa SQL Server (`mssql`)
 
 | Parametr Compose | Wartość | Znaczenie |
@@ -95,7 +99,7 @@ Aby ich użyć, należy dodać je do sekcji `environment` usługi `sql-backup-to
 
 ### Wolumeny i ścieżki
 
-Wolumen `backup-data` jest montowany jednocześnie jako `/var/opt/mssql/backup` w kontenerze SQL Servera i `/app/backups` w kontenerze aplikacji. Obie ścieżki wskazują tę samą zawartość, dlatego wartości `MSSQL_BACKUP_PATH`, `APP_BACKUP_PATH` oraz punkty montowania muszą pozostać ze sobą zgodne.
+Wolumen `backup-data` jest montowany jednocześnie jako `/var/opt/mssql/backup` w kontenerze SQL Servera i `/app/backups` w kontenerze aplikacji. Obie ścieżki wskazują tę samą zawartość, dlatego wartości `MSSQL_BACKUP_PATH`, `APP_BACKUP_PATH` oraz punkty montowania muszą pozostać ze sobą zgodne. Przy każdym starcie entrypoint aplikacji koryguje prawa katalogu wolumenu i katalogów roboczych bez usuwania jego zawartości.
 
 Wolumen `sql-data` przechowuje `/var/opt/mssql`, a więc dane instancji niezależnie od cyklu życia kontenera. Polecenie `docker compose down` zachowuje wolumeny, natomiast `docker compose down -v` usuwa je wraz ze wszystkimi bazami i backupami.
 
