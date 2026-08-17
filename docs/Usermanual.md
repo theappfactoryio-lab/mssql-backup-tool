@@ -1,208 +1,224 @@
-# Instrukcja użytkownika MSSQLBackupTool
+# MSSQLBackupTool User Manual
 
-MSSQLBackupTool to aplikacja webowa służąca do tworzenia, przesyłania, pobierania, weryfikowania i odtwarzania kopii zapasowych baz danych Microsoft SQL Server.
+MSSQLBackupTool is a web application for creating, uploading, downloading, verifying, and restoring Microsoft SQL Server database backups.
 
-> **Ważne:** odtwarzanie, usuwanie bazy danych oraz usuwanie plików backupu może prowadzić do nieodwracalnej utraty danych. Przed zatwierdzeniem operacji zawsze sprawdź nazwę bazy i wybrany plik.
+> **Important:** Restoring or deleting a database and deleting a backup file can cause irreversible data loss. Always verify the database name and selected file before confirming an operation.
 
-## 1. Otwieranie aplikacji
+## 1. Opening the application
 
-1. Otwórz w przeglądarce adres podany przez administratora.
-2. Jeżeli przeglądarka wyświetli okno logowania, podaj współdzielony login i hasło otrzymane od administratora. Aplikacja korzysta z HTTP Basic Auth, więc nie ma osobnego ekranu ani przycisku wylogowania; zakończenie dostępu może wymagać zamknięcia wszystkich okien przeglądarki.
-3. Poczekaj na załadowanie list baz danych i plików backupów.
-4. W sekcji **Środowisko SQL Server** sprawdź stan połączenia:
-   - **Połączono** — aplikacja może komunikować się z SQL Serverem;
-   - **Brak połączenia** — część funkcji nie będzie dostępna. Odśwież informacje przyciskiem **↻**, a jeśli problem nie ustąpi, skontaktuj się z administratorem.
+1. Open the address supplied by the administrator in a web browser.
+2. If the browser displays a sign-in dialog, enter the shared username and password supplied by the administrator. The application uses HTTP Basic Authentication, so it has no separate sign-in page or sign-out button. Ending access may require closing all browser windows.
+3. Wait for the database and backup-file lists to load.
+4. Check the status in **SQL Server environment**:
+   - **Connected** — the application can communicate with SQL Server;
+   - **Disconnected** — some functions are unavailable. Select **↻** to refresh the information. Contact the administrator if the problem persists.
 
-W prawym górnym rogu można wybrać język angielski, niemiecki, hiszpański lub polski oraz zmienić jasny lub ciemny motyw i kolor podstawowy interfejsu. Zmiana języka przeładowuje stronę. Wszystkie te ustawienia są zapamiętywane w przeglądarce; bez zapisanego wyboru używany jest język ustawiony przez administratora, domyślnie angielski.
+When connected, this section also shows the server or instance, SQL Server version and edition, host, connection database, login, transport, authentication method, and configured address. The version links to the corresponding Microsoft SQL Server version history.
 
-## 2. Tworzenie backupu
+The controls in the upper-right corner select English, German, Spanish, or Polish; switch between the light and dark themes; and change the primary interface color. Changing the language reloads the page. These preferences are stored in the browser. If no language preference has been stored, the administrator's configured language is used; English is the default.
 
-1. W sekcji **Wykonaj backup** wybierz bazę danych.
-2. Wybierz rodzaj kompresji:
-   - **Bez kompresji** — tworzy plik `.bak`;
-   - **Natywna MSSQL** — tworzy plik `.bak` skompresowany przez SQL Server;
-   - **ZIP** — tworzy archiwum ZIP;
-   - **GZIP** — tworzy archiwum GZIP.
-3. Kliknij **Wykonaj backup**.
-4. Obserwuj postęp i log w oknie operacji.
-5. Po zakończeniu sprawdź komunikat:
-   - **Sukces** — backup został utworzony i pojawi się na liście plików;
-   - **Błąd** — przeczytaj treść komunikatu i log operacji.
-6. Kliknij **OK**, aby zamknąć okno.
+## 2. Creating a backup
 
-Po udanej kompresji ZIP lub GZIP pośredni plik `.bak` jest automatycznie usuwany.
+1. In **Create backup**, select a database.
+2. Select a compression type:
+   - **No compression** — creates a `.bak` file;
+   - **Native MSSQL** — creates a `.bak` file using SQL Server compression;
+   - **ZIP** — creates a ZIP archive;
+   - **GZIP** — creates a GZIP archive;
+   - **7Z** — creates a 7Z archive.
+3. Select **Create backup**.
+4. Monitor the progress and log in the operation dialog.
+5. Review the final status:
+   - **Success** — the backup was created and appears in the file list;
+   - **Error** — review the error message and operation log.
+6. Select **OK** to close the dialog.
 
-## 3. Przesyłanie pliku backupu
+The application creates full `COPY_ONLY` backups with `CHECKSUM` and initializes a new backup file. **Native MSSQL** additionally enables SQL Server compression. After successful ZIP, GZIP, or 7Z compression, the intermediate `.bak` file is deleted. Incomplete working files are removed if backup creation fails.
 
-Obsługiwane są pliki `.bak`, `.bak.zip`, `.zip`, `.bak.gz` i `.gz`.
+Only online user databases are available for backup. System databases and database snapshots are excluded.
 
-1. W sekcji **Pliki backupów** kliknij **Wybierz i prześlij plik**.
-2. Wybierz plik z komputera.
-3. Przesyłanie rozpocznie się automatycznie.
-4. Obserwuj wskaźnik postępu.
-5. Po zakończeniu sprawdź wynik operacji i kliknij **OK**.
+## 3. Uploading a backup file
 
-Maksymalny dopuszczalny rozmiar pliku ustala administrator. Nie zamykaj ani nie odświeżaj strony podczas przesyłania.
+Supported filename extensions are `.bak`, `.bak.zip`, `.zip`, `.bak.gz`, `.gz`, `.bak.7z`, and `.7z`; extension matching is case-insensitive.
 
-## 4. Zarządzanie plikami backupów
+1. In **Backup files**, select **Choose and upload a file**.
+2. Select a file from the computer. Upload starts automatically.
+3. Monitor the progress indicator.
+4. Review the result and select **OK**.
 
-Tabela **Pliki backupów** zawiera nazwę, format, rozmiar, datę modyfikacji i dostępne akcje.
+The administrator configures the maximum upload size. Do not close or reload the page while a file is being uploaded. An upload never overwrites a file with the same name.
 
-### Pobieranie pliku
+For security, filenames must be 1–200 characters long, must not start with a period, and cannot contain paths, control characters, or reserved Windows names. Unicode letters, numbers, spaces, and `_( ).-` are accepted.
 
-Kliknij ikonę pobierania przy wybranym pliku. Przeglądarka rozpocznie zapis pliku na komputerze.
+## 4. Managing backup files
 
-### Usuwanie pliku
+The **Backup files** table shows each file's name, format, size, modification time, and available actions.
 
-1. Kliknij ikonę kosza przy wybranym pliku.
-2. Sprawdź nazwę pliku w oknie potwierdzenia.
-3. Kliknij **Usuń plik**.
+### Downloading a file
 
-> Usuniętego pliku nie można odzyskać za pomocą aplikacji.
+Select the download icon beside the required file. The browser starts saving it to the computer.
 
-Aby pobrać aktualną listę plików, kliknij przycisk **↻** obok nagłówka sekcji.
+### Deleting a file
 
-## 5. Weryfikowanie backupu
+1. Select the trash icon beside the required file.
+2. Verify the filename in the confirmation dialog.
+3. Select **Delete file**.
 
-Weryfikacja sprawdza, czy SQL Server potrafi odczytać backup. Nie zastępuje ona próbnego odtworzenia bazy ani kontroli poprawności danych.
+> A deleted file cannot be recovered through the application.
 
-1. W sekcji **Odtwórz bazę** wybierz plik backupu.
-2. Kliknij **Zweryfikuj**.
-3. Obserwuj log operacji.
-4. Po zakończeniu zapoznaj się z wynikiem i kliknij **OK**.
+Select **↻** beside the section heading to refresh the file list.
 
-Dla archiwum ZIP lub GZIP aplikacja najpierw bezpiecznie rozpakuje plik `.bak`. Plik tymczasowy zostanie usunięty po zakończeniu operacji, także w przypadku błędu. Oryginalne archiwum pozostanie na liście.
+## 5. Verifying a backup
 
-## 6. Odtwarzanie backupu jako nowej bazy
+Verification reads the backup header, runs `RESTORE VERIFYONLY` with checksum validation when available, and reads the backup file list. It confirms that SQL Server can interpret the backup, but it does not replace a test restore or validation of the restored data.
 
-1. W sekcji **Odtwórz bazę** wybierz plik backupu.
-2. Zaznacz **Nowa baza**.
-3. Wpisz nazwę nowej bazy w polu **Nazwa bazy docelowej**.
-4. Opcjonalnie zaznacz **Automatycznie rozłącz aktywne sesje**, jeśli wymaga tego sytuacja.
-5. Kliknij **Zweryfikuj i odtwórz**.
-6. Obserwuj postęp oraz log operacji.
-7. Po powodzeniu sprawdź, czy nowa baza pojawiła się w tabeli **Bazy danych**.
+1. In **Restore database**, select a backup file.
+2. Select **Verify**.
+3. Monitor the operation log.
+4. Review the result and select **OK**.
 
-Nazwa docelowa nie może wskazywać istniejącej bazy w trybie **Nowa baza**.
+For ZIP, GZIP, or 7Z archives, the application safely extracts a temporary `.bak` file first. The temporary file is deleted when the operation finishes, including after an error. The original archive remains in the file list.
 
-## 7. Nadpisywanie istniejącej bazy
+A ZIP or 7Z archive must contain exactly one unencrypted `.bak` entry without a directory path. Extracted-size and compression-ratio safety limits apply. Encrypted and multipart 7Z archives are unsupported. GZIP archives are also subject to the configured extracted-size limit.
 
-> **Ostrzeżenie:** ta operacja bezpowrotnie zastępuje zawartość wybranej bazy danymi z backupu.
+## 6. Restoring a backup as a new database
 
-1. W sekcji **Odtwórz bazę** wybierz właściwy plik backupu.
-2. Zaznacz **Istniejąca baza**.
-3. Wybierz bazę docelową z listy.
-4. Upewnij się, że zaznaczona jest opcja **Zezwalam na nadpisanie istniejącej bazy**.
-5. Jeżeli baza ma aktywne połączenia i mogą one zostać przerwane, zaznacz **Automatycznie rozłącz aktywne sesje**.
-6. Jeszcze raz porównaj nazwę pliku i bazy docelowej.
-7. Kliknij **Zweryfikuj i odtwórz**.
-8. Obserwuj operację aż do jej zakończenia.
+1. In **Restore database**, select a backup file.
+2. Select **New database**.
+3. Enter a name in **Target database name**.
+4. Select **Verify and restore**.
+5. Monitor the progress and operation log.
+6. After a successful restore, confirm that the new database appears in **Databases**.
 
-Bez zgody na nadpisanie aplikacja odrzuci żądanie. Jeśli aktywne sesje uniemożliwiają odtworzenie, operacja może się nie powieść, chyba że wybrano ich automatyczne rozłączenie.
+The target name must not identify an existing database in **New database** mode. **Automatically disconnect active sessions** applies only when overwriting an existing database.
 
-## 8. Informacje o bazach danych
+During restore, the application maps data and log files to the data and log paths configured by the administrator. It generates safe physical filenames rather than reusing physical paths stored in the backup. A restore is rejected if a generated path is already used by another database.
 
-Tabela **Bazy danych** prezentuje:
+## 7. Overwriting an existing database
 
-- nazwę i stan bazy;
-- przydzielony rozmiar plików danych i logu;
-- łączny przydzielony rozmiar;
-- liczbę aktywnych połączeń;
-- model odzyskiwania;
-- datę ostatniego pełnego backupu;
-- dostępne akcje administracyjne.
+> **Warning:** This operation permanently replaces the contents of the selected database with data from the backup.
 
-Wyświetlane rozmiary oznaczają miejsce przydzielone plikom, a nie faktycznie wykorzystane dane. Znak **—** oznacza brak informacji lub niewystarczające uprawnienia aplikacji.
+1. In **Restore database**, select the correct backup file.
+2. Select **Existing database**.
+3. Select the target database.
+4. Confirm that **Allow the existing database to be overwritten** is selected. The interface selects this consent automatically when existing-database mode is chosen, but it can be cleared.
+5. If active connections may be interrupted, select **Automatically disconnect active sessions**.
+6. Compare the backup filename and target database name again.
+7. Select **Verify and restore**.
+8. Monitor the operation until it finishes.
 
-Aby odświeżyć tabelę, kliknij przycisk **↻** obok nagłówka sekcji.
+The application rejects the request without overwrite consent. If active sessions prevent the restore, it may fail unless automatic disconnection is enabled. Automatic disconnection switches the database to single-user mode and rolls back active transactions immediately. The application attempts to return the database to multi-user mode even if restore fails.
 
-## 9. Usuwanie bazy danych
+## 8. Database information
 
-> **Niebezpieczeństwo:** usunięcie bazy powoduje bezpowrotną utratę wszystkich zapisanych w niej danych.
+The **Databases** table shows:
 
-1. Jeśli dane mogą być jeszcze potrzebne, najpierw wykonaj i pobierz backup.
-2. W tabeli **Bazy danych** kliknij ikonę kosza przy właściwej bazie.
-3. Dokładnie sprawdź nazwę w oknie potwierdzenia.
-4. Kliknij **Usuń bazę**.
-5. Zaczekaj na zakończenie operacji i sprawdź jej wynik.
+- database name and state;
+- allocated data-file and log-file sizes;
+- total allocated size;
+- number of active connections;
+- recovery model;
+- date of the last full backup;
+- available administrative actions.
 
-## 10. Zmniejszanie logu transakcyjnego
+The displayed sizes are allocated file space, not the amount of data currently in use. Hovering over the log size shows the number of LDF files and the log-reuse wait reason. An em dash (**—**) means that information is unavailable or that the application lacks sufficient permissions.
 
-Przyciski zmniejszania logu są widoczne tylko wtedy, gdy administrator włączy tę funkcję. Są przeznaczone do wyjątkowych sytuacji, głównie w środowiskach deweloperskich. Shrink nie powinien być wykonywany jako rutynowa konserwacja.
+Select **↻** beside the section heading to refresh the table.
 
-### Zwolnienie nieaktywnego końca logu
+## 9. Deleting a database
 
-Opcja **Zwolnij nieaktywny koniec logu** zachowuje bieżący model odzyskiwania. Może nie odzyskać miejsca, jeżeli końcowe fragmenty logu są aktywne lub baza oczekuje na backup logu.
+> **Danger:** Deleting a database permanently destroys all data stored in it. The operation automatically disconnects all sessions and rolls back uncommitted transactions immediately.
 
-1. Kliknij odpowiednią ikonę przy bazie.
-2. Przeczytaj ostrzeżenie.
-3. Kliknij **Zmniejsz log**, jeśli operacja jest uzasadniona.
+1. If the data may still be needed, create and download a backup first.
+2. In **Databases**, select the trash icon beside the correct database.
+3. Carefully verify the name in the confirmation dialog.
+4. Select **Delete database**.
+5. Wait for the operation to finish and review its result.
 
-### Agresywne zmniejszenie do 256 MB na plik LDF
+## 10. Shrinking a transaction log
 
-> **Ostrzeżenie:** tryb agresywny czasowo przełącza bazę na model `SIMPLE` i przerywa łańcuch backupów logu.
+Log-shrink actions are visible only when enabled by the administrator and only for online databases that are not read-only. They are intended for exceptional situations, primarily in development environments. Shrinking should not be routine maintenance, and neither mode disconnects active users.
 
-Po użyciu tej opcji dla bazy pracującej wcześniej w modelu `FULL` lub `BULK_LOGGED` należy wykonać regularny pełny backup, aby rozpocząć nowy łańcuch backupów logu. W razie wątpliwości skonsultuj operację z administratorem bazy danych.
+### Releasing the inactive end of the log
 
-## 11. Przebieg operacji
+**Release inactive end of log** preserves the current recovery model and releases inactive space at the end of every LDF file. It may recover little or no space if the final log regions are active or the database is waiting for a log backup.
 
-Jednocześnie może trwać tylko jedna operacja zmieniająca dane. W tym czasie można nadal pobierać pliki.
+1. Select the corresponding icon beside the database.
+2. Read the warning.
+3. Select **Shrink log** only if the operation is justified.
 
-Okno operacji pokazuje:
+### Aggressively shrinking to 256 MB per LDF file
 
-- aktualny stan i opis etapu;
-- procent postępu, jeśli jest dostępny;
-- log komunikatów aplikacji i SQL Servera;
-- końcowy wynik albo opis błędu.
+> **Warning:** Aggressive mode temporarily changes the database to the `SIMPLE` recovery model and breaks the transaction-log backup chain.
 
-Okna trwającej operacji nie można zamknąć przyciskiem **OK**. Zamknięcie karty przeglądarki nie musi przerwać rozpoczętego backupu lub odtwarzania, jednak utrudnia obserwowanie postępu. Po ponownym otwarciu aplikacja może wyświetlić bieżący status, o ile usługa nie została zrestartowana.
+If the database previously used `FULL` or `BULK_LOGGED`, a database administrator must create a regular full backup **without `COPY_ONLY`** after this operation to start a new log backup chain. Backups created by MSSQLBackupTool use `COPY_ONLY` and therefore do not start a new chain. Consult a database administrator if uncertain.
 
-## 12. Najczęstsze problemy
+## 11. Operation progress
 
-### Brak połączenia z SQL Serverem
+Only one managed operation can run at a time. This includes backup, upload, verification, restore, deletion, and log shrinking. Files can still be downloaded and displayed information can be refreshed while an operation is running.
 
-- odśwież sekcję **Środowisko SQL Server**;
-- odczekaj chwilę i ponów próbę;
-- jeśli problem nie ustępuje, przekaż administratorowi skonfigurowany adres i treść błędu.
+The operation dialog shows:
 
-### Brak bazy lub pliku na liście
+- current status and stage description;
+- percentage progress when available;
+- application and SQL Server log messages;
+- the final result or error description.
 
-- kliknij **↻** przy odpowiedniej sekcji;
-- sprawdź, czy inna operacja nadal trwa;
-- upewnij się, że poprzednia operacja zakończyła się powodzeniem.
+A running operation dialog cannot be closed with **OK**. Closing the browser tab does not necessarily stop a backup or restore, but it prevents progress monitoring. Reopening the application may display the current or most recent operation status, provided that the application service has not restarted. Only the latest status is retained in process memory.
 
-### Nie można odtworzyć backupu
+## 12. Troubleshooting
 
-Możliwe przyczyny obejmują:
+### SQL Server is disconnected
 
-- backup utworzony przez nowszą wersję SQL Servera niż serwer docelowy;
-- brak certyfikatu wymaganego przez backup zaszyfrowany za pomocą TDE;
-- aktywne połączenia z bazą docelową;
-- brak miejsca na dysku;
-- uszkodzony lub nieobsługiwany backup;
-- niewystarczające uprawnienia konta używanego przez aplikację.
+- refresh **SQL Server environment**;
+- wait briefly and try again;
+- if the problem persists, send the configured address and error text to the administrator.
 
-Przeczytaj końcowy komunikat i log operacji. Przy zgłoszeniu problemu podaj administratorowi czas wystąpienia, nazwę operacji oraz pełną treść komunikatu — bez ujawniania haseł i innych danych poufnych.
+### A database or file is missing from a list
 
-### Przesyłanie pliku zostało odrzucone
+- select **↻** beside the corresponding section;
+- check whether another operation is still running;
+- confirm that the previous operation completed successfully.
 
-Sprawdź rozszerzenie i rozmiar pliku. Dozwolony limit może być niższy od rozmiaru wybranego backupu. Nie zmieniaj ręcznie rozszerzenia pliku, aby ominąć kontrolę formatu.
+### A backup cannot be restored
 
-### Żądanie zostało odrzucone
+Possible causes include:
 
-Odśwież stronę i spróbuj ponownie. Komunikat może pojawić się po długim czasie bezczynności, zmianie adresu aplikacji lub ponownym uruchomieniu usługi.
+- the backup was created by a newer SQL Server version than the target server;
+- a certificate required for a TDE-protected backup is unavailable;
+- active connections exist on the target database;
+- insufficient disk space;
+- a damaged or unsupported backup;
+- insufficient permissions for the account used by the application.
 
-## 13. Ograniczenia
+Review the final message and operation log. When reporting a problem, provide the time, operation name, and complete error message, but never disclose passwords or other secrets.
 
-Aplikacja obsługuje jeden pełny zestaw backupu zapisany w jednym pliku. Nie obsługuje między innymi backupów wielozestawowych, rozłożonych na kilka plików, zaszyfrowanych archiwów, FILESTREAM ani In-Memory OLTP.
+### Upload was rejected
 
-Backupu utworzonego na nowszej wersji SQL Servera nie można odtworzyć na wersji starszej. Backup bazy chronionej TDE wymaga odpowiedniego certyfikatu na serwerze docelowym.
+Check the filename extension and file size. The configured limit may be smaller than the selected backup. Do not rename an unsupported file merely to bypass extension validation. A duplicate filename is also rejected.
 
-## 14. Zasady bezpiecznej pracy
+### ZIP or GZIP extraction was rejected
 
-- Przed operacją destrukcyjną sprawdź nazwę pliku i bazy co najmniej dwa razy.
-- Przed nadpisaniem lub usunięciem ważnej bazy wykonaj backup i pobierz go poza serwer.
-- Nie udostępniaj backupów osobom nieuprawnionym — mogą zawierać dane poufne.
-- Nie zamykaj strony podczas przesyłania pliku.
-- Nie wykonuj zmniejszania logu bez uzasadnienia i znajomości skutków.
-- Nie przesyłaj administratorowi haseł, tokenów ani innych sekretów wraz ze zgłoszeniem błędu.
+A ZIP file must contain exactly one `.bak` file, cannot contain a path or encrypted entry, and must satisfy extraction safety limits. Both ZIP and GZIP content must remain within the configured extracted-size limit.
+
+### Request was rejected
+
+Reload the page and try again. This can occur when the page was opened before the application service restarted, when the page token is missing or invalid, or when the application is accessed through an address that does not match the configured public origin.
+
+## 13. Limitations
+
+- The application supports one full backup set in one file and one media family. Multi-set and striped backups are not supported.
+- Restore supports standard SQL Server data and log files. FILESTREAM, In-Memory OLTP, and other backup file types are not supported.
+- Encrypted ZIP or GZIP archives are not supported.
+- A backup created by a newer SQL Server version cannot be restored to an older version.
+- Restoring a TDE-protected database requires the appropriate certificate on the target server.
+- Most dynamic interface actions require access to the externally hosted HTMX library. If the browser cannot reach the configured CDN, forms, confirmations, and partial refreshes may not work correctly.
+
+## 14. Safe working practices
+
+- Verify the filename and database name at least twice before a destructive operation.
+- Before overwriting or deleting an important database, create a backup and download it away from the server.
+- Do not share backup files with unauthorized people; they may contain confidential data.
+- Do not close or reload the page during an upload.
+- Do not shrink transaction logs without a valid reason and an understanding of the consequences.
+- Never include passwords, tokens, or other secrets in a support request.

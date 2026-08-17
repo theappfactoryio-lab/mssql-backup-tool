@@ -48,7 +48,7 @@
           <fieldset><legend><%= t('backup.compression') %></legend>
             <label><input type="radio" name="compression" value="none" checked> <%= t('backup.compression.none') %></label>
             <label><input type="radio" name="compression" value="native"> <%= t('backup.compression.native') %></label>
-            <label><input type="radio" name="compression" value="zip"> ZIP</label><label><input type="radio" name="compression" value="gzip"> GZIP</label>
+            <label><input type="radio" name="compression" value="zip"> ZIP</label><label><input type="radio" name="compression" value="gzip"> GZIP</label><label><input type="radio" name="compression" value="7z"> 7Z</label>
           </fieldset>
           <button class="button button--primary" type="submit"><%= t('backup.submit') %></button>
         </form>
@@ -73,7 +73,7 @@
     <section class="files-section">
       <div class="section-heading"><div><h2><%= t('files.title') %></h2><p id="file-count"><%= t('files.sharedVolumeCount', { count: formatNumber(files.length) }) %></p></div>
         <div class="section-tools"><form class="upload" enctype="multipart/form-data" hx-post="/files/upload" hx-target="#operation-dialog-host" hx-swap="outerHTML">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>"><label class="button button--primary file-picker"><span class="file-picker__text"><%= t('files.upload.choose') %></span><input type="file" name="backupFile" accept=".bak,.zip,.gz" required></label>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>"><label class="button button--primary file-picker"><span class="file-picker__text"><%= t('files.upload.choose') %></span><input type="file" name="backupFile" accept=".bak,.zip,.gz,.7z" required></label>
           <div class="upload-progress" hidden aria-live="polite"><span><%= t('files.upload.progressLabel') %> <strong class="upload-progress__value"><%= formatPercent(0) %></strong></span><progress value="0" max="100"><%= formatPercent(0) %></progress></div>
         </form><button class="refresh-button" type="button" title="<%= t('files.refresh.title') %>" aria-label="<%= t('files.refresh.aria') %>" hx-get="/partials/files" hx-target="#files-section-data" hx-swap="outerHTML"><span class="refresh-button__icon" aria-hidden="true">↻</span></button></div>
       </div><div id="files-section-data"><%- include('partials/file-table', { files, csrfToken, oob: false }) %></div>
@@ -85,6 +85,41 @@
     </section>
     <%- include('partials/sql-environment', { sqlEnvironment: { ...sqlEnvironment, target: sqlEnvironment.target ?? t('environment.notConfigured') } }) %>
   </main>
+  <dialog class="operation-dialog rename-dialog" id="rename-dialog" aria-labelledby="rename-dialog-title" aria-describedby="rename-dialog-description">
+    <form method="post" hx-post="/files/rename" hx-target="#operation-dialog-host" hx-swap="outerHTML" data-rename-form novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="filename" id="rename-original-filename" value="">
+      <div class="operation-dialog__header">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div><h2 id="rename-dialog-title"><%= t('files.rename.dialogTitle') %></h2><p id="rename-dialog-description"><%= t('files.rename.dialogDescription') %></p></div>
+      </div>
+      <div class="rename-dialog__body">
+        <label for="rename-new-base"><%= t('files.rename.fieldLabel') %></label>
+        <div class="rename-dialog__filename"><input id="rename-new-base" name="newBase" type="text" required maxlength="190" aria-describedby="rename-dialog-description rename-suffix rename-error"><span id="rename-suffix" class="rename-dialog__suffix" aria-label="<%= t('files.rename.suffixLabel') %>"></span></div>
+        <p id="rename-error" class="field-error" aria-live="polite"></p>
+      </div>
+      <div class="operation-dialog__footer rename-dialog__actions"><button class="button button--secondary" type="button" data-rename-cancel><%= t('common.cancel') %></button><button class="button button--primary" type="submit"><%= t('files.rename.action') %></button></div>
+    </form>
+  </dialog>
+
+  <dialog class="operation-dialog compress-dialog" id="compress-dialog" aria-labelledby="compress-dialog-title" aria-describedby="compress-dialog-description">
+    <form method="post" hx-post="/files/compress" hx-target="#operation-dialog-host" hx-swap="outerHTML" data-compress-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="filename" id="compress-filename" value="">
+      <div class="operation-dialog__header">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div><h2 id="compress-dialog-title"><%= t('files.compress.dialogTitle') %></h2><p id="compress-dialog-description"><%= t('files.compress.dialogDescription') %></p></div>
+      </div>
+      <fieldset class="compress-dialog__formats">
+        <legend><%= t('files.compress.menu.options') %></legend>
+        <% for (const archiveFormat of [{ value: 'zip', label: 'ZIP' }, { value: 'gzip', label: 'GZIP' }, { value: '7z', label: '7Z' }]) { %>
+          <label class="compress-format"><input type="radio" name="format" value="<%= archiveFormat.value %>" <%= archiveFormat.value === 'zip' ? 'checked' : '' %>><span><strong><%= archiveFormat.label %></strong><small><%= t(`files.compress.${archiveFormat.value}.tooltip`) %></small></span></label>
+        <% } %>
+      </fieldset>
+      <div class="operation-dialog__footer compress-dialog__actions"><button class="button button--secondary" type="button" data-compress-cancel><%= t('common.cancel') %></button><button class="button button--primary" type="submit"><%= t('files.compress.action') %></button></div>
+    </form>
+  </dialog>
+
   <dialog class="operation-dialog confirmation-dialog" data-confirm-dialog aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message"><div class="operation-dialog__header"><span class="status-dot" aria-hidden="true"></span><div><h2 id="confirm-dialog-title" tabindex="-1"><%= t('confirmation.defaultTitle') %></h2><p id="confirm-dialog-message"></p></div><span class="operation-dialog__state"><%= t('confirmation.state') %></span></div><div class="operation-dialog__footer confirmation-dialog__actions"><button class="button button--secondary" type="button" data-confirm-cancel><%= t('common.cancel') %></button><button class="button button--danger" type="button" data-confirm-accept><%= t('common.confirm') %></button></div></dialog>
 </body>
 </html>

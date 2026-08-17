@@ -16,10 +16,23 @@ test('normalizes supported languages and defaults to English', () => {
 });
 
 test('translates, interpolates, pluralizes and formats each locale', () => {
+  const newKeys = [
+    'files.rename.aria', 'files.rename.tooltip', 'files.rename.dialogTitle',
+    'files.rename.dialogDescription', 'files.rename.fieldLabel', 'files.rename.suffixLabel',
+    'files.rename.action', 'files.compress.zip.aria', 'files.compress.zip.tooltip',
+    'files.compress.gzip.aria', 'files.compress.gzip.tooltip',
+    'files.extract.aria', 'files.extract.tooltip',
+    'operation.summary.fileRenaming', 'operation.summary.fileCompressing',
+    'operation.summary.filePublishing', 'validation.backupCompressionFormatInvalid',
+    'validation.compressSourceMustBeBak', 'validation.extractSourceMustBeArchive',
+    'validation.filenameUnchanged', 'validation.renameBaseRequired',
+    'validation.renameBaseCharactersInvalid', 'errors.archiveInvalid',
+  ];
   for (const language of ['en', 'de', 'es', 'pl']) {
     const translator = createTranslator(language);
     assert.notEqual(translator.t('backup.title'), 'backup.title');
     assert.match(translator.t('operation.summary.fileVerifying', { filename: 'Demo.bak' }), /Demo\.bak/);
+    for (const key of newKeys) assert.notEqual(translator.t(key, { filename: 'Demo.bak' }), key, `${language}: ${key}`);
     assert.match(translator.formatBytes(1536), /KB$/);
     assert.ok(translator.formatDateTime(new Date('2026-08-16T12:00:00Z')));
   }

@@ -109,7 +109,8 @@ export function clientMessages(translator) {
     'errors.operationFailedTitle', 'status.error', 'common.ok', 'client.upload.uploading',
     'files.upload.choose', 'client.upload.dialogTitle', 'client.upload.dialogSummary',
     'status.running', 'operations.progress', 'operations.running.cannotClose',
-    'validation.restoreOverwriteConsentRequired',
+    'validation.restoreOverwriteConsentRequired', 'validation.renameBaseRequired',
+    'validation.renameBaseCharactersInvalid', 'validation.filenameUnchanged',
   ];
   return Object.fromEntries(keys.map((key) => [key, translator.t(key)]));
 }

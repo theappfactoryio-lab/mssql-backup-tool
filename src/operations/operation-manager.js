@@ -79,7 +79,8 @@ export class OperationManager {
     };
     let sequence = 0;
     const addEvent = ({ level = 'info', source = 'application', message, progress = null, phase = operation.phase }) => {
-      const numericProgress = Number(progress);
+      const hasProgress = progress !== null && progress !== undefined && progress !== '';
+      const numericProgress = hasProgress ? Number(progress) : Number.NaN;
       const event = {
         sequence: ++sequence,
         timestamp: new Date(),
