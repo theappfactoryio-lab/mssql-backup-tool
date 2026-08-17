@@ -6,7 +6,7 @@ import { mapSqlError } from '../db/database-repository.js';
 import { message } from '../i18n/index.js';
 
 export class RestoreService {
-  constructor({ database, files, config }) { Object.assign(this, { database, files, config }); }
+  constructor({ database, files, config, sevenZip }) { Object.assign(this, { database, files, config, sevenZip }); }
 
   async prepare(filename, operation) {
     operation.log(message('operation.event.fileChecking', { filename }));
@@ -14,12 +14,26 @@ export class RestoreService {
     if (filename.toLowerCase().endsWith('.bak')) return { sqlPath: this.files.toSqlPath(filename), cleanup: null };
     operation.updatePhase('extracting', message('operation.summary.fileExtracting', { filename }));
     const work = this.files.createWorkPath('.bak');
-    if (filename.toLowerCase().endsWith('.zip')) {
+    const lower = filename.toLowerCase();
+    const displayFormat = lower.endsWith('.zip') ? 'ZIP' : lower.endsWith('.gz') ? 'GZIP' : '7-Zip';
+    const onProgress = ({ progress }) => operation.reportProgress(
+      progress,
+      message('operation.progress.archiveExtracting', { format: displayFormat, progress }),
+    );
+    if (lower.endsWith('.zip')) {
       await extractZip(source.filePath, work.appPath, {
         maxBytes: this.config.maxExtractedBytes,
         maxCompressionRatio: this.config.maxCompressionRatio,
+        onProgress,
       });
-    } else await extractGzip(source.filePath, work.appPath, this.config.maxExtractedBytes);
+    } else if (lower.endsWith('.gz')) {
+      await extractGzip(source.filePath, work.appPath, this.config.maxExtractedBytes, { onProgress });
+    } else if (lower.endsWith('.7z')) {
+      await this.sevenZip.extractArchive(source.filePath, work.appPath, {
+        maxBytes: this.config.maxExtractedBytes,
+        maxCompressionRatio: this.config.maxCompressionRatio,
+      });
+    } else throw new ValidationError(message('validation.extractSourceMustBeArchive'));
     operation.log(message('operation.event.fileExtractionCompleted'));
     return { sqlPath: work.sqlPath, cleanup: work.appPath };
   }

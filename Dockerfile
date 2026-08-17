@@ -1,12 +1,12 @@
-FROM node:24-alpine AS dependencies
+FROM node:24-alpine3.22 AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:24-alpine
+FROM node:24-alpine3.22
 ENV NODE_ENV=production
 WORKDIR /app
-RUN apk add --no-cache su-exec
+RUN apk add --no-cache su-exec 7zip
 COPY --from=dependencies --chown=10001:0 /app/node_modules ./node_modules
 COPY --chown=10001:0 package.json ./
 COPY --chown=10001:0 src ./src

@@ -103,10 +103,18 @@ Obsługiwane formaty:
 .zip
 .gz
 
-
 Przesłany plik powinien zostać zapisany we współdzielonym katalogu backupów.
 
 Jeśli plik jest skompresowany i został wybrany do odtworzenia, aplikacja powinna go rozpakować przed rozpoczęciem operacji restore.
+
+1.13. Zarządzanie plikami (rename/compress/extract)
+
+Aplikacja udostępnia dodatkowe operacje na plikach:
+- Rename — zmiana nazwy pliku: użytkownik edytuje część bazową; istniejący sufiks (.bak, .bak.zip, .bak.gz, .bak.7z, .zip, .gz, .7z) jest zachowywany. Operacja jest bezpieczna i nie nadpisuje istniejących plików.
+- Compress — spakowanie istniejącego .bak do .bak.zip, .bak.gz lub .bak.7z; operacja tworzy nowy plik i zachowuje oryginalny .bak.
+- Extract — trwałe wypakowanie archiwum ZIP/GZIP/7Z do .bak w katalogu backupów; ZIP/7Z musi zawierać dokładnie jeden wpis .bak bez ścieżki i bez szyfrowania; 7Z nie może być wieloczęściowy; ekstrakcja podlega limitowi maxExtractedBytes i maxCompressionRatio. 7Z używa `7zz` z `-mx=5`, maksymalnie dwoma wątkami i stałym limitem czasu.
+
+Wszystkie trzy operacje są wykonywane jako zarządzane operacje w tle i pokazują standardowy dialog operacji. Konflikt nazwy końcowej kończy się błędem 409 i wymaga ręcznej interwencji użytkownika.
 
 1.7. Odtwarzanie backupu
 

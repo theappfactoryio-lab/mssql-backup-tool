@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { AppError, ValidationError } from '../errors/app-error.js';
 import { message } from '../i18n/index.js';
 
-const ALLOWED_EXTENSIONS = ['.bak.zip', '.bak.gz', '.bak', '.zip', '.gz'];
+const ALLOWED_EXTENSIONS = ['.bak.zip', '.bak.gz', '.bak.7z', '.bak', '.zip', '.gz', '.7z'];
 const RESERVED_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
 
 export function validateBackupFilename(filename) {
@@ -93,11 +93,14 @@ export class FileService {
 
   async publish(tempPath, filename) {
     const target = this.resolve(filename);
+    let targetCreated = false;
     try {
       await link(tempPath, target);
+      targetCreated = true;
       await unlink(tempPath);
       return target;
     } catch (error) {
+      if (targetCreated) await unlink(target).catch(() => {});
       if (error.code === 'EEXIST') {
         throw new AppError('File already exists.', {
           code: 'FILE_EXISTS',
@@ -110,10 +113,65 @@ export class FileService {
     }
   }
 
+  async rename(oldName, newBase) {
+    // newBase is the editable base name without suffix; preserve suffix from oldName
+    validateBackupFilename(oldName);
+    if (typeof newBase !== 'string' || newBase.length < 1 || newBase.length > 200) {
+      throw new ValidationError(message('validation.filenameLengthInvalid'));
+    }
+    // determine suffix to preserve
+    const lower = oldName.toLowerCase();
+    const suffix = ALLOWED_EXTENSIONS.find((ext) => lower.endsWith(ext));
+    const newName = `${newBase}${suffix}`;
+    if (newName === oldName) throw new ValidationError(message('validation.filenameUnchanged'));
+
+    // validate new name
+    validateBackupFilename(newName);
+
+    const sourcePath = this.resolve(oldName);
+    const targetPath = this.resolve(newName);
+
+    // check source
+    const info = await lstat(sourcePath).catch((error) => {
+      if (error.code === 'ENOENT') {
+        throw new AppError('File does not exist.', {
+          code: 'FILE_NOT_FOUND', statusCode: 404, publicMessage: message('errors.fileNotFound'), cause: error,
+        });
+      }
+      throw error;
+    });
+    if (!info.isFile() || info.isSymbolicLink()) throw new ValidationError(message('validation.selectedPathNotRegularFile'));
+
+    // attempt safe link then unlink
+    try {
+      await link(sourcePath, targetPath);
+      await unlink(sourcePath);
+      return { filename: newName };
+    } catch (error) {
+      // if we created target but unlink failed, try to remove target to avoid duplicate
+      if (error.code === 'EEXIST') {
+        throw new AppError('File already exists.', { code: 'FILE_EXISTS', statusCode: 409, publicMessage: message('errors.fileAlreadyExists'), cause: error });
+      }
+      // try cleanup if target was created
+      try { await unlink(targetPath).catch(() => {}); } catch {}
+      throw error;
+    }
+  }
+
   async inspect(filename) {
     const filePath = this.resolve(filename);
-    const info = await stat(filePath);
-    if (!info.isFile()) throw new ValidationError(message('validation.selectedPathNotFile'));
+    const info = await lstat(filePath).catch((error) => {
+      if (error.code === 'ENOENT') {
+        throw new AppError('File does not exist.', {
+          code: 'FILE_NOT_FOUND', statusCode: 404,
+          publicMessage: message('errors.fileNotFound'), cause: error,
+        });
+      }
+      throw error;
+    });
+    if (!info.isFile() || info.isSymbolicLink()) {
+      throw new ValidationError(message('validation.selectedPathNotRegularFile'));
+    }
     return { filePath, info };
   }
 

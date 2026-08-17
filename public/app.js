@@ -61,6 +61,111 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+let renameTrigger = null;
+let compressTrigger = null;
+
+function closeRenameDialog(restoreFocus = true) {
+  const dialog = document.getElementById('rename-dialog');
+  if (dialog?.open) dialog.close();
+  if (restoreFocus && renameTrigger?.isConnected) renameTrigger.focus();
+  if (restoreFocus) renameTrigger = null;
+}
+
+function closeCompressDialog(restoreFocus = true) {
+  const dialog = document.getElementById('compress-dialog');
+  if (dialog?.open) dialog.close();
+  if (restoreFocus && compressTrigger?.isConnected) compressTrigger.focus();
+  if (restoreFocus) compressTrigger = null;
+}
+
+function validateRenameForm() {
+  const dialog = document.getElementById('rename-dialog');
+  const input = dialog?.querySelector('#rename-new-base');
+  const error = dialog?.querySelector('#rename-error');
+  const original = dialog?.querySelector('#rename-original-filename')?.value ?? '';
+  if (!input || !error) return false;
+
+  const value = input.value.trim();
+  const suffix = dialog.querySelector('#rename-suffix')?.textContent ?? '';
+  let message = '';
+  if (!value) message = clientMessage('validation.renameBaseRequired');
+  else if (!/^[\p{L}\p{N} _().-]+$/u.test(value) || value.startsWith('.')) {
+    message = clientMessage('validation.renameBaseCharactersInvalid');
+  } else if (`${value}${suffix}` === original) message = clientMessage('validation.filenameUnchanged');
+
+  input.setAttribute('aria-invalid', String(Boolean(message)));
+  error.textContent = message;
+  if (message) input.focus();
+  return !message;
+}
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-rename]');
+  if (!button) return;
+  const dialog = document.getElementById('rename-dialog');
+  if (!dialog) return;
+  renameTrigger = button;
+  dialog.querySelector('#rename-original-filename').value = button.dataset.filename ?? '';
+  dialog.querySelector('#rename-suffix').textContent = button.dataset.suffix ?? '';
+  const input = dialog.querySelector('#rename-new-base');
+  input.value = button.dataset.base ?? '';
+  input.removeAttribute('aria-invalid');
+  dialog.querySelector('#rename-error').textContent = '';
+  dialog.showModal();
+  input.select();
+});
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-compress]');
+  if (!button) return;
+  const dialog = document.getElementById('compress-dialog');
+  if (!dialog) return;
+  compressTrigger = button;
+  dialog.querySelector('#compress-filename').value = button.dataset.filename ?? '';
+  dialog.showModal();
+  dialog.querySelector('input[name="format"]:checked')?.focus();
+});
+
+document.addEventListener('click', (event) => {
+  if (event.target.closest('[data-rename-cancel]')) closeRenameDialog();
+  if (event.target.closest('[data-compress-cancel]')) closeCompressDialog();
+});
+
+document.getElementById('rename-dialog')?.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  closeRenameDialog();
+});
+
+document.getElementById('compress-dialog')?.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  closeCompressDialog();
+});
+
+document.querySelector('[data-compress-form]')?.addEventListener('htmx:beforeRequest', () => {
+  operationTrigger = compressTrigger;
+  closeCompressDialog(false);
+});
+
+document.querySelector('[data-rename-form]')?.addEventListener('submit', (event) => {
+  if (!validateRenameForm()) event.preventDefault();
+});
+
+document.querySelector('[data-rename-form]')?.addEventListener('htmx:beforeRequest', (event) => {
+  if (!validateRenameForm()) {
+    event.preventDefault();
+    return;
+  }
+  operationTrigger = renameTrigger;
+  closeRenameDialog(false);
+});
+
+document.getElementById('rename-new-base')?.addEventListener('input', () => {
+  const input = document.getElementById('rename-new-base');
+  const error = document.getElementById('rename-error');
+  input?.removeAttribute('aria-invalid');
+  if (error) error.textContent = '';
+});
+
 function openOperationDialog() {
   const dialog = document.querySelector('[data-operation-dialog]');
   if (!dialog || dialog.open) return;

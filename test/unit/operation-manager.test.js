@@ -81,8 +81,11 @@ test('prowadzi chronologiczny log, raportuje postęp i usuwa go po potwierdzeniu
   const completed = manager.getStatus(operation.id);
   assert.equal(completed.status, 'succeeded');
   assert.deepEqual(completed.events.map((event) => event.sequence), [1, 2, 3, 4, 5]);
+  assert.equal(completed.events[0].progress, null);
+  assert.equal(completed.events[1].progress, null);
   assert.equal(completed.events[2].source, 'sql-server');
   assert.equal(completed.events[2].progress, 10);
+  assert.equal(completed.events[3].progress, null);
   assert.equal(completed.progress, 100);
   assert.equal(manager.acknowledge(operation.id), true);
   assert.equal(manager.getStatus(), null);

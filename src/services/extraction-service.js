@@ -7,8 +7,9 @@ import yauzl from 'yauzl';
 import { AppError } from '../errors/app-error.js';
 import { message } from '../i18n/index.js';
 
-function limiter(maxBytes) {
+function limiter(maxBytes, { totalBytes = null, onProgress } = {}) {
   let total = 0;
+  let lastReported = -1;
   return new Transform({
     transform(chunk, encoding, callback) {
       total += chunk.length;
@@ -17,7 +18,16 @@ function limiter(maxBytes) {
           code: 'EXTRACT_LIMIT', statusCode: 422,
           publicMessage: message('errors.backupExtractedSizeExceeded'),
         }));
-      } else callback(null, chunk);
+        return;
+      }
+      if (Number.isSafeInteger(totalBytes) && totalBytes >= 0) {
+        const progress = totalBytes === 0 ? 100 : Math.min(100, Math.floor(total * 100 / totalBytes));
+        if (progress === 100 || progress >= lastReported + 5) {
+          lastReported = progress;
+          onProgress?.({ progress, processedBytes: total, totalBytes });
+        }
+      }
+      callback(null, chunk);
     },
   });
 }
@@ -26,11 +36,13 @@ async function removeQuietly(filePath) {
   await unlink(filePath).catch((error) => { if (error.code !== 'ENOENT') throw error; });
 }
 
-export async function extractGzip(sourcePath, targetPath, maxBytes) {
+export async function extractGzip(sourcePath, targetPath, maxBytes, { onProgress } = {}) {
   try {
+    const sourceInfo = await stat(sourcePath);
+    onProgress?.({ progress: 0, processedBytes: 0, totalBytes: sourceInfo.size });
     await pipeline(
-      createReadStream(sourcePath), createGunzip(), limiter(maxBytes),
-      createWriteStream(targetPath, { flags: 'wx' }),
+      createReadStream(sourcePath), limiter(sourceInfo.size, { totalBytes: sourceInfo.size, onProgress }),
+      createGunzip(), limiter(maxBytes), createWriteStream(targetPath, { flags: 'wx' }),
     );
     return targetPath;
   } catch (error) {
@@ -53,7 +65,7 @@ function openEntry(zip, entry) {
   });
 }
 
-export async function extractZip(sourcePath, targetPath, { maxBytes, maxCompressionRatio }) {
+export async function extractZip(sourcePath, targetPath, { maxBytes, maxCompressionRatio, onProgress }) {
   const zip = await openZip(sourcePath);
   try {
     const entry = await new Promise((resolve, reject) => {
@@ -78,7 +90,11 @@ export async function extractZip(sourcePath, targetPath, { maxBytes, maxCompress
         publicMessage: message('errors.zipUnsupportedOrUnsafe') });
     }
     const source = await openEntry(zip, entry);
-    await pipeline(source, limiter(maxBytes), createWriteStream(targetPath, { flags: 'wx' }));
+    onProgress?.({ progress: 0, processedBytes: 0, totalBytes: entry.uncompressedSize });
+    await pipeline(
+      source, limiter(maxBytes, { totalBytes: entry.uncompressedSize, onProgress }),
+      createWriteStream(targetPath, { flags: 'wx' }),
+    );
     return targetPath;
   } catch (error) {
     await removeQuietly(targetPath);

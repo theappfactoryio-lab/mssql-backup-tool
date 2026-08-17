@@ -222,6 +222,46 @@ export function createApp({ config, operationManager, services = {} }) {
         createReadStream(filePath, { fd: handle.fd, autoClose: true }).on('error', next).pipe(response);
       } catch (error) { next(error); }
     });
+
+    // New: rename, compress, extract endpoints
+    app.post('/files/rename', protectMutation, (request, response, next) => {
+      try {
+        const oldName = request.body.filename;
+        const newBase = request.body.newBase?.trim();
+        const operation = operationManager.tryStart({ type: 'rename-file', summary: message('operation.summary.fileRenaming', { filename: oldName }),
+          work: async (context) => {
+            context.updatePhase('renaming', message('operation.summary.fileRenaming', { filename: oldName }));
+            return services.files.rename(oldName, newBase);
+          } });
+        accepted(response, operation);
+      } catch (error) { next(error); }
+    });
+
+    app.post('/files/compress', protectMutation, (request, response, next) => {
+      try {
+        const filename = request.body.filename;
+        const format = request.body.format;
+        const operation = operationManager.tryStart({ type: 'compress-file', summary: message('operation.summary.fileCompressing', { filename }),
+          work: async (context) => {
+            context.updatePhase('checking', message('operation.summary.fileCompressing', { filename }));
+            return services.archive.compress(filename, format, context);
+          } });
+        accepted(response, operation);
+      } catch (error) { next(error); }
+    });
+
+    app.post('/files/extract', protectMutation, (request, response, next) => {
+      try {
+        const filename = request.body.filename;
+        const operation = operationManager.tryStart({ type: 'extract-file', summary: message('operation.summary.fileExtracting', { filename }),
+          work: async (context) => {
+            context.updatePhase('checking', message('operation.summary.fileExtracting', { filename }));
+            return services.archive.extract(filename, context);
+          } });
+        accepted(response, operation);
+      } catch (error) { next(error); }
+    });
+
     app.post('/files/delete', protectMutation, (request, response, next) => {
       try {
         const filename = request.body.filename;

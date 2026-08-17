@@ -127,9 +127,10 @@ The aggressive mode breaks the log backup chain. After returning to `FULL` or `B
 
 ## Behavior
 
-- Available formats are `.bak`, `.bak.zip`, `.bak.gz`, `.zip`, and `.gz`.
-- A backup can be uncompressed, compressed natively by MSSQL, or compressed as ZIP or GZIP.
-- After successful ZIP/GZIP compression, the source `.bak` file is deleted.
+- Available formats are `.bak`, `.bak.zip`, `.bak.gz`, `.bak.7z`, `.zip`, `.gz`, and `.7z`.
+- A backup can be uncompressed, compressed natively by MSSQL, or compressed as ZIP, GZIP, or 7Z.
+- After successful ZIP/GZIP/7Z compression during backup creation, the intermediate `.bak` file is deleted. Manual compression preserves the source file.
+- 7Z operations use the Alpine `7zip` package (`7zz`) with compression level `-mx=5`, at most two threads, a fixed process timeout, and no shell invocation. Encrypted, multipart, multi-entry, linked, or path-bearing archives are rejected.
 - An archive uploaded by the user remains on the volume. The temporary `.bak` file is deleted after verification or restore, including when an error occurs.
 - Only one mutating operation can run at a time. Downloads remain available.
 - Closing the browser tab does not interrupt a backup or restore that has already started. Restarting the container clears the in-memory status and may interrupt the TDS connection.
@@ -137,7 +138,7 @@ The aggressive mode breaks the log backup chain. After returning to `FULL` or `B
 
 ## Limitations
 
-The first version supports one full backup set stored in a single file. Multi-set and striped backups, FILESTREAM, In-Memory OLTP, and encrypted archives are rejected. A TDE-encrypted backup requires the appropriate certificate on the SQL Server side. A backup from a newer version of SQL Server cannot be restored on an older version; the application returns a clear error received from the server.
+The first version supports one full backup set stored in a single file. Multi-set and striped backups, FILESTREAM, In-Memory OLTP, and encrypted archives are rejected. The runtime image includes the Alpine `7zip` package; 7-Zip licensing information is available from the Alpine package metadata and the 7-Zip project. A TDE-encrypted backup requires the appropriate certificate on the SQL Server side. A backup from a newer version of SQL Server cannot be restored on an older version; the application returns a clear error received from the server.
 
 ## Tests
 

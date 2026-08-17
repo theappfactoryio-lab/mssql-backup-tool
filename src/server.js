@@ -7,6 +7,8 @@ import { createPool } from './db/pool.js';
 import { DatabaseRepository } from './db/database-repository.js';
 import { BackupService } from './services/backup-service.js';
 import { RestoreService } from './services/restore-service.js';
+import { ArchiveService } from './services/archive-service.js';
+import { SevenZipService } from './services/seven-zip-service.js';
 import { createTranslator } from './i18n/index.js';
 
 const config = loadConfig();
@@ -16,10 +18,12 @@ const files = new FileService(config);
 await files.initialize();
 const pool = createPool(config.database);
 const database = new DatabaseRepository(pool);
+const sevenZip = new SevenZipService();
 const app = createApp({ config, operationManager, services: {
   files, database,
-  backup: new BackupService({ database, files }),
-  restore: new RestoreService({ database, files, config }),
+  backup: new BackupService({ database, files, sevenZip }),
+  restore: new RestoreService({ database, files, config, sevenZip }),
+  archive: new ArchiveService({ files, config, sevenZip }),
 } });
 const server = createServer(app);
 server.requestTimeout = config.requestTimeoutMs;
