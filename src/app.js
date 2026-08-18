@@ -2,9 +2,9 @@ import express from 'express';
 import helmet from 'helmet';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createReadStream } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
 import multer from 'multer';
 import { create as contentDisposition } from 'content-disposition';
 import { createBasicAuthMiddleware } from './middleware/basic-auth.js';
@@ -216,10 +216,10 @@ export function createApp({ config, operationManager, services = {} }) {
     });
     app.get('/files/:name/download', async (request, response, next) => {
       try {
-        const { filePath, handle, info } = await services.files.openForDownload(request.params.name);
+        const { stream, info } = await services.files.openForDownload(request.params.name);
         response.set({ 'Content-Type': 'application/octet-stream', 'Content-Length': info.size,
-          'Content-Disposition': contentDisposition(request.params.name), 'Accept-Ranges': 'bytes' });
-        createReadStream(filePath, { fd: handle.fd, autoClose: true }).on('error', next).pipe(response);
+          'Content-Disposition': contentDisposition(request.params.name) });
+        await pipeline(stream, response);
       } catch (error) { next(error); }
     });
 
