@@ -202,7 +202,7 @@ export class FileService {
       const info = await handle.stat();
       const linkInfo = await lstat(filePath);
       if (!info.isFile() || linkInfo.isSymbolicLink()) throw new ValidationError(message('validation.selectedPathNotRegularFile'));
-      return { filePath, handle, info };
+      return { stream: handle.createReadStream({ autoClose: true }), info };
     } catch (error) {
       await handle.close();
       throw error;
