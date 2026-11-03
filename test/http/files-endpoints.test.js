@@ -7,6 +7,7 @@ import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { OperationManager } from '../../src/operations/operation-manager.js';
 import { FileService } from '../../src/services/file-service.js';
+import { loadConfig } from '../../src/config.js';
 
 test('files endpoints require CSRF and Origin and return 202 for accepted operations', async () => {
   const manager = new OperationManager();
@@ -30,6 +31,39 @@ test('files endpoints require CSRF and Origin and return 202 for accepted operat
   // accepted
   res = await request(app).post('/files/rename').set('Origin', 'http://localhost:8080').type('form').send({ _csrf: token, filename: 'x.bak', newBase: 'y' });
   assert.equal(res.status, 202);
+});
+
+test('files mutations accept both configured protocols while preserving CSRF', async () => {
+  const origins = ['http://backup.example.test', 'https://backup.example.test'];
+  for (const origin of origins) {
+    const calls = [];
+    const config = loadConfig({
+      PUBLIC_ORIGINS: origins.join(','), PUBLIC_ORIGIN: 'http://legacy.example.test',
+      AUTH_ENABLED: 'false', MSSQL_HOST: 'stub', MSSQL_USER: 'stub', MSSQL_PASSWORD: 'stub',
+    });
+    const app = createApp({
+      config,
+      operationManager: new OperationManager(),
+      services: { files: {
+        list: async () => [],
+        rename: async (filename, newBase) => {
+          calls.push({ filename, newBase });
+          return { filename: `${newBase}.bak` };
+        },
+      } },
+    });
+    const input = { filename: 'sample.bak', newBase: 'renamed' };
+    const rejected = await request(app).post('/files/rename').set('Origin', origin).type('form').send(input);
+    assert.equal(rejected.status, 422);
+    const legacy = await request(app).post('/files/rename').set('Origin', 'http://legacy.example.test')
+      .type('form').send({ ...input, _csrf: app.locals.csrfToken });
+    assert.equal(legacy.status, 422);
+    assert.deepEqual(calls, []);
+    const accepted = await request(app).post('/files/rename').set('Origin', origin)
+      .type('form').send({ ...input, _csrf: app.locals.csrfToken });
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(calls, [input]);
+  }
 });
 
 test('download streams the complete file and closes its handle', async () => {

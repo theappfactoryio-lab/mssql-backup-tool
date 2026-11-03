@@ -17,15 +17,22 @@ const rootDirectory = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 export function createApp({ config, operationManager, services = {} }) {
   const app = express();
   const csrfToken = randomUUID();
+  const publicOrigins = new Set(config.publicOrigins ?? [config.publicOrigin ?? 'http://localhost:8080']);
+  const protocols = new Set([...publicOrigins].map((origin) => new URL(origin).protocol));
+  const dualProtocol = protocols.has('http:') && protocols.has('https:');
+  const languageCookieName = dualProtocol ? 'ui_language_dual' : 'ui_language';
   app.disable('x-powered-by');
   app.set('view engine', 'ejs');
   app.set('views', path.join(rootDirectory, 'views'));
   app.locals.operationManager = operationManager;
   app.locals.csrfToken = csrfToken;
   app.locals.enableShrinkLog = config.enableShrinkLog;
-  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    ...(dualProtocol ? { strictTransportSecurity: { maxAge: 0, includeSubDomains: false } } : {}),
+  }));
   app.get('/health', (request, response) => response.json({ status: 'ok' }));
-  app.use(createLocaleMiddleware(config.defaultLanguage ?? 'en'));
+  app.use(createLocaleMiddleware(config.defaultLanguage ?? 'en', languageCookieName));
   app.use(createBasicAuthMiddleware(config.auth));
   app.use(express.urlencoded({ extended: false, limit: '64kb' }));
   app.use('/public', express.static(path.join(rootDirectory, 'public'), { fallthrough: false }));
@@ -108,7 +115,7 @@ export function createApp({ config, operationManager, services = {} }) {
   function protectMutation(request, response, next) {
     const origin = request.get('origin');
     const originCanBeValidated = origin && origin !== 'null';
-    if ((originCanBeValidated && origin !== config.publicOrigin) || request.body?._csrf !== csrfToken) {
+    if ((originCanBeValidated && !publicOrigins.has(origin)) || request.body?._csrf !== csrfToken) {
       return next(new ValidationError(message('errors.requestRejected')));
     }
     next();
@@ -117,8 +124,8 @@ export function createApp({ config, operationManager, services = {} }) {
   app.post('/language', protectMutation, (request, response, next) => {
     const language = normalizeLanguage(request.body.language);
     if (!language) return next(new ValidationError(message('config.languageUnsupported', { supportedLanguages: 'en, de, es, pl' })));
-    const secure = new URL(config.publicOrigin ?? 'http://localhost').protocol === 'https:' ? '; Secure' : '';
-    response.setHeader('Set-Cookie', `ui_language=${language}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`);
+    const secure = !dualProtocol && protocols.has('https:') ? '; Secure' : '';
+    response.setHeader('Set-Cookie', `${languageCookieName}=${language}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`);
     response.redirect(303, '/');
   });
 

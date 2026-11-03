@@ -15,6 +15,22 @@ test('normalizes supported languages and defaults to English', () => {
   assert.deepEqual(parseCookies('theme=dark; ui_language=es'), { theme: 'dark', ui_language: 'es' });
 });
 
+test('prefers the dual-protocol cookie and falls back to legacy and default language', () => {
+  const cases = [
+    ['ui_language_dual=es', 'es'],
+    ['ui_language=pl; ui_language_dual=de', 'de'],
+    ['ui_language_dual=invalid; ui_language=pl', 'pl'],
+    ['ui_language=de', 'de'],
+    ['ui_language_dual=invalid; ui_language=invalid', 'en'],
+    ['', 'en'],
+  ];
+  for (const [cookie, language] of cases) {
+    assert.equal(resolveRequestLanguage({ headers: { cookie } }, 'en', 'ui_language_dual'), language);
+  }
+  assert.equal(resolveRequestLanguage({ headers: { cookie: 'ui_language_dual=pl' } }, 'de'), 'de');
+  assert.equal(resolveRequestLanguage({ headers: { cookie: 'ui_language=es; ui_language_dual=pl' } }, 'de'), 'es');
+});
+
 test('translates, interpolates, pluralizes and formats each locale', () => {
   const newKeys = [
     'files.rename.aria', 'files.rename.tooltip', 'files.rename.dialogTitle',

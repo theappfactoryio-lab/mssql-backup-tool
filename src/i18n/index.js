@@ -88,8 +88,10 @@ export function parseCookies(header = '') {
   }, {});
 }
 
-export function resolveRequestLanguage(request, defaultLanguage = 'en') {
-  return normalizeLanguage(parseCookies(request?.headers?.cookie).ui_language)
+export function resolveRequestLanguage(request, defaultLanguage = 'en', languageCookieName = 'ui_language') {
+  const cookies = parseCookies(request?.headers?.cookie);
+  return normalizeLanguage(cookies[languageCookieName])
+    ?? normalizeLanguage(cookies.ui_language)
     ?? normalizeLanguage(defaultLanguage, 'en');
 }
 
@@ -125,9 +127,9 @@ export function localizeOperation(operation, translator) {
   };
 }
 
-export function createLocaleMiddleware(defaultLanguage = 'en') {
+export function createLocaleMiddleware(defaultLanguage = 'en', languageCookieName = 'ui_language') {
   return (request, response, next) => {
-    const translator = createTranslator(resolveRequestLanguage(request, defaultLanguage));
+    const translator = createTranslator(resolveRequestLanguage(request, defaultLanguage, languageCookieName));
     Object.assign(response.locals, translator, {
       languages: LANGUAGE_NAMES,
       translateMessage: translator.translate,

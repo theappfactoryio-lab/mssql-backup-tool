@@ -1,6 +1,7 @@
 import en from './en.js';
 
 export default { ...en,
+  'config.publicOriginInvalid':'{name} debe contener orígenes HTTP/HTTPS con un host y un puerto opcional (1–65535), sin credenciales, comodines, rutas, consultas ni fragmentos.',
   'language.label':'Idioma','language.reloadHint':'Cambiar el idioma recarga la página.','language.apply':'Aplicar','header.environment':'SQL Server local','common.actions':'Acciones','common.cancel':'Cancelar','common.confirm':'Confirmar','common.warning':'Advertencia:',
   'backup.title':'Crear copia de seguridad','backup.database':'Base de datos','backup.compression':'Compresión','backup.compression.none':'Sin compresión','backup.compression.native':'Compresión nativa de MSSQL','backup.submit':'Crear copia de seguridad',
   'restore.title':'Restaurar base de datos','restore.backupFile':'Archivo de copia','restore.targetMode':'Modo de destino','restore.targetMode.new':'Nueva base de datos','restore.targetMode.existing':'Base de datos existente','restore.targetDatabase':'Nombre de la base de datos de destino','restore.overwriteIrreversible':'sobrescribir una base de datos existente no se puede deshacer.','restore.allowOverwrite':'Permitir sobrescribir la base de datos existente','restore.disconnectUsers':'Desconectar automáticamente las sesiones activas','restore.verify':'Verificar','restore.verifyAndRestore':'Verificar y restaurar',

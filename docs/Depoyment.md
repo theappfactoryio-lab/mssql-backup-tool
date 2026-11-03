@@ -36,7 +36,23 @@ Running the image without the SQL Server connection configuration and `AUTH_USER
 docker compose up -d --build
 ```
 
-When exposing the web interface outside localhost, terminate TLS at a reverse proxy and use HTTPS only. After changing the login credentials, recreate or restart the application container.
+On remote or untrusted networks, terminate TLS at a reverse proxy and use HTTPS only. HTTP does not encrypt Basic Auth credentials or backup data. After changing the login credentials, recreate or restart the application container.
+
+### HTTP and HTTPS behind a reverse proxy
+
+In a trusted local/internal environment, the same host can serve both protocols without an HTTP-to-HTTPS redirect. Configure both origins explicitly in the root `.env` file:
+
+```dotenv
+PUBLIC_ORIGINS=http://mssql.localtest.me,https://mssql.localtest.me
+```
+
+A nonempty `PUBLIC_ORIGINS` list overrides `PUBLIC_ORIGIN`; an unset or empty list preserves the single-origin configuration. Include any nonstandard ports and explicitly add `http://localhost:8080` if local state-changing requests should also work. Recreate the application container after changing these variables.
+
+This configures request validation, not TLS: Node.js still listens on HTTP, and the root Compose file publishes only `127.0.0.1:8080`. The existing proxy must provide the HTTPS listener and certificate and must not force an HTTP-to-HTTPS redirect.
+
+Mixed HTTP/HTTPS mode uses a shared language-preference cookie and sends HSTS `max-age=0`. Visit HTTPS once to clear this host's previously cached HSTS policy; parent-domain HSTS and browser preload can still prevent HTTP access. See [HTTP and HTTPS origins](../README.md#http-and-https-origins) for cookie migration and the complete configuration rules.
+
+The Compose examples in [environments](../environments/) remain unchanged and still pass only an HTTPS `PUBLIC_ORIGIN`. Enabling the new list there requires separate deployment changes.
 
 ## 3. Automatic Publishing with GitHub Actions
 

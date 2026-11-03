@@ -70,7 +70,8 @@ The `${NAME:-value}` syntax specifies a default when a variable is unset or empt
 |---|---:|---|
 | `PORT` | `8080` | HTTP port listened on inside the container; the allowed range is 1–65535. |
 | `APP_HOST` | `0.0.0.0` | Listen address inside the container. `0.0.0.0` is required for Docker port forwarding to work. |
-| `PUBLIC_ORIGIN` | `http://localhost:8080` | Public application origin: scheme, host, and optional port. It is used to validate the origin of mutating requests; behind a reverse proxy, it must match the address seen by the user. |
+| `PUBLIC_ORIGIN` | `http://localhost:8080` | Single public application origin used to validate mutating requests when `PUBLIC_ORIGINS` is unset or empty. Include the scheme, host, and optional port as seen by the browser. |
+| `PUBLIC_ORIGINS` | empty | Optional complete, comma-separated allowlist of public HTTP/HTTPS origins. A nonempty list overrides `PUBLIC_ORIGIN`; no other addresses are added automatically. |
 | `APP_LANGUAGE` | `en` | Default language for the UI and application logs. Allowed values: `en`, `de`, `es`, `pl`. A language selected by the user in the UI overrides this value in their browser. |
 | `MSSQL_HOST` | `mssql` | SQL Server host name. In Compose, this is the service name resolved by internal DNS. |
 | `MSSQL_PORT` | `1433` | SQL Server TCP port, from 1 to 65535. This is the port on the Compose network, not the port published on the host. |
@@ -87,6 +88,31 @@ The `${NAME:-value}` syntax specifies a default when a variable is unset or empt
 | `MAX_COMPRESSION_RATIO` | `200` | Maximum ratio of extracted size to archive size. Protects against zip bombs; the minimum is 1. |
 | `TEMP_MAX_AGE_HOURS` | `24` | Maximum age of temporary files before cleanup, expressed as a positive whole number of hours. |
 | `ENABLE_SHRINK_LOG` | `false` | Enables administrative log-shrinking actions. Accepts only `true` or `false`. |
+
+### HTTP and HTTPS origins
+
+HTTP and HTTPS on the same host are different origins. To allow both in a trusted local/internal environment, set a complete list in `.env`:
+
+```dotenv
+PUBLIC_ORIGINS=http://mssql.localtest.me,https://mssql.localtest.me
+```
+
+A nonempty `PUBLIC_ORIGINS` overrides `PUBLIC_ORIGIN`; leaving it unset or empty preserves the single-origin configuration. Include each public port explicitly when it is nonstandard, for example `http://mssql.localtest.me:8080` and `https://mssql.localtest.me:8443`. Add `http://localhost:8080` to the list if direct local state-changing requests should remain valid. No hosts, ports, or opposite-protocol variants are added automatically. CSRF tokens are still required for mutating requests.
+
+Origins are validated at startup and normalized, including hostname casing, default ports and duplicate entries. A trailing root slash is allowed; credentials, wildcards, other paths, query strings, fragments, empty list entries and invalid ports are rejected.
+
+This list does not enable TLS, open ports or redirect traffic. Node.js still serves HTTP, and the root Compose file publishes only `127.0.0.1:8080`. HTTPS must be provided by an existing reverse proxy with a certificate. To keep HTTP independent, the proxy must not force HTTP-to-HTTPS redirects. Recreate the application container after changing the configuration.
+
+When the effective list contains both HTTP and HTTPS, the application:
+
+- Uses the shared `ui_language_dual` cookie without `Secure`. It contains only a language code, not login credentials. A valid dual-mode cookie takes precedence over the legacy `ui_language` cookie; the legacy value is used as a fallback. The distinct name avoids attempting to overwrite a previously set `ui_language; Secure` cookie over HTTP.
+- Sends `Strict-Transport-Security: max-age=0` without `includeSubDomains`. Visit HTTPS once after switching modes to clear this host's previously cached HSTS policy. Merely omitting HSTS would not clear it. Parent-domain HSTS and browser preload can still force HTTPS and cannot be removed by this application's response for a subdomain.
+
+Single-protocol configurations retain the legacy `ui_language` cookie, its `Secure` flag for HTTPS-only setups and the existing HSTS policy. Use HTTPS only on remote/untrusted networks: HTTP does not encrypt Basic Auth credentials or backup data.
+
+The examples in [environments](environments/) remain unchanged and still pass only an HTTPS `PUBLIC_ORIGIN`; enabling a list there requires separate deployment changes.
+
+### Other optional variables
 
 The application also supports optional variables that are not exposed by default in `compose.yaml`:
 

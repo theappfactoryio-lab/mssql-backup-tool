@@ -240,6 +240,7 @@ export default {
   'auth.unauthorized': 'The username or password is incorrect, or sign-in was cancelled. Refresh the page to try again.',
   'config.integerOutOfRange': '{name} must be an integer from {min} to {max}.',
   'config.requiredVariableMissing': 'Required variable {name} is missing.',
+  'config.publicOriginInvalid': '{name} must contain HTTP/HTTPS origins with a host and optional port (1–65535), without credentials, wildcards, paths, query strings or fragments.',
   'config.booleanInvalid': '{name} must be true or false.',
   'config.absolutePosixPathRequired': '{name} must be an absolute POSIX path.',
   'config.languageUnsupported': 'APP_LANGUAGE must be one of: {supportedLanguages}.',

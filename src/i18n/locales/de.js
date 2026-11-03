@@ -1,6 +1,7 @@
 import en from './en.js';
 
 export default { ...en,
+  'config.publicOriginInvalid':'{name} muss HTTP/HTTPS-Origins mit Host und optionalem Port (1–65535) enthalten, ohne Zugangsdaten, Platzhalter, Pfade, Abfrageparameter oder Fragmente.',
   'language.label':'Sprache','language.reloadHint':'Beim Ändern der Sprache wird die Seite neu geladen.','language.apply':'Übernehmen','header.environment':'Lokaler SQL Server',
   'common.actions':'Aktionen','common.cancel':'Abbrechen','common.confirm':'Bestätigen','common.warning':'Warnung:',
   'backup.title':'Sicherung erstellen','backup.database':'Datenbank','backup.compression':'Komprimierung','backup.compression.none':'Ohne Komprimierung','backup.compression.native':'Native MSSQL-Komprimierung','backup.submit':'Sicherung erstellen',

@@ -26,6 +26,7 @@ services:
       PORT: 8080
       APP_HOST: 0.0.0.0
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
+      PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-}
       APP_LANGUAGE: ${APP_LANGUAGE:-en}
       AUTH_ENABLED: ${AUTH_ENABLED:-true}
       AUTH_USERNAME: ${AUTH_USERNAME:-}

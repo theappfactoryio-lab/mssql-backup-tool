@@ -29,18 +29,39 @@ function absolutePath(env, name, fallback, t) {
   return value.replace(/\/$/, '') || '/';
 }
 
+function parsePublicOrigins(env, t) {
+  const name = env.PUBLIC_ORIGINS?.trim() ? 'PUBLIC_ORIGINS' : 'PUBLIC_ORIGIN';
+  const value = env[name]?.trim() || 'http://localhost:8080';
+  const values = name === 'PUBLIC_ORIGINS' ? value.split(',') : [value];
+  const invalidOriginMessage = t('config.publicOriginInvalid', { name });
+  const origins = values.map((value) => {
+    const origin = value.trim();
+    let url;
+    try { url = new URL(origin); }
+    catch { throw new ValidationError(invalidOriginMessage); }
+    if (!/^https?:\/\/[^/?#\\\s@]+\/?$/i.test(origin)
+      || url.hostname.includes('*') || url.port === '0' || /:\/?$/.test(origin)) {
+      throw new ValidationError(invalidOriginMessage);
+    }
+    return url.origin;
+  });
+  return [...new Set(origins)];
+}
+
 export function loadConfig(env = process.env) {
   const requestedLanguage = env.APP_LANGUAGE?.trim() || 'en';
   const defaultLanguage = normalizeLanguage(requestedLanguage);
   if (!defaultLanguage) throw new ValidationError(createTranslator('en').t('config.languageUnsupported', { supportedLanguages: SUPPORTED_LANGUAGES.join(', ') }));
   const { t } = createTranslator(defaultLanguage);
   const authEnabled = boolean(env, 'AUTH_ENABLED', true, t);
+  const publicOrigins = parsePublicOrigins(env, t);
 
   return {
     defaultLanguage,
     host: env.APP_HOST?.trim() || '0.0.0.0',
     port: integer(env, 'PORT', 8080, t, { min: 1, max: 65535 }),
-    publicOrigin: env.PUBLIC_ORIGIN?.trim() || 'http://localhost:8080',
+    publicOrigin: publicOrigins[0],
+    publicOrigins,
     auth: {
       enabled: authEnabled,
       username: authEnabled ? required(env, 'AUTH_USERNAME', t) : null,

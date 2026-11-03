@@ -64,6 +64,7 @@ services:
       PORT: 8080
       APP_HOST: 0.0.0.0
       PUBLIC_ORIGIN: http://localhost:8080
+      PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-}
       MSSQL_HOST: mssql
       MSSQL_PORT: 1433
       MSSQL_USER: sa
@@ -103,7 +104,8 @@ The most important environment variables are:
 | Variable | Default | Description |
 |---|---:|---|
 | `PORT` | `8080` | Application HTTP port |
-| `PUBLIC_ORIGIN` | `http://localhost:8080` | Public origin used to validate state-changing requests |
+| `PUBLIC_ORIGIN` | `http://localhost:8080` | Single public origin used to validate state-changing requests when `PUBLIC_ORIGINS` is unset or empty |
+| `PUBLIC_ORIGINS` | empty | Complete comma-separated HTTP/HTTPS origin allowlist; a nonempty list overrides `PUBLIC_ORIGIN` without adding any addresses automatically |
 | `APP_LANGUAGE` | `en` | Default UI and application-log language: `en`, `de`, `es`, or `pl`. A browser selection stored in a cookie overrides this UI default. |
 | `AUTH_ENABLED` | `true` | Enables HTTP Basic Auth for every endpoint except `/health` |
 | `AUTH_USERNAME` | required when enabled | Shared web interface username |
@@ -122,6 +124,10 @@ The most important environment variables are:
 | `MAX_EXTRACTED_BYTES` | `107374182400` | Maximum extracted backup size; 100 GiB by default |
 | `MAX_COMPRESSION_RATIO` | `200` | Maximum permitted archive compression ratio |
 | `ENABLE_SHRINK_LOG` | `false` | Enables transaction log shrinking operations |
+
+To allow the same host over both protocols in a trusted local/internal environment, set `PUBLIC_ORIGINS=http://mssql.localtest.me,https://mssql.localtest.me`. Include nonstandard ports explicitly and add local addresses separately when needed. Origins are normalized and validated at startup; the list does not disable CSRF checks or provide TLS. HTTPS still requires a reverse proxy and certificate.
+
+Mixed HTTP/HTTPS mode shares the language preference using `ui_language_dual` without `Secure` and sends HSTS `max-age=0` to clear this host's cached HTTPS-only policy. Single-protocol setups preserve legacy behavior. See [HTTP and HTTPS origins](../README.md#http-and-https-origins) for cookie migration, inherited/preloaded HSTS limitations and the unchanged deployment examples.
 
 The application and SQL Server must have access to the same backup files. The example configuration provides this through the shared `backup-data` volume.
 
